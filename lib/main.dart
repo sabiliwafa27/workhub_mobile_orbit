@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/erp_colors.dart';
+import 'core/theme/whatsapp_colors.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
-import 'features/home/screens/home_screen.dart';
+import 'features/home/screens/whatsapp_main_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +34,7 @@ class WorkHubApp extends ConsumerWidget {
         scaffoldBackgroundColor: ErpColors.scaffoldBackground,
         fontFamily: 'Roboto',
       ),
-      home: authState.isAuthenticated ? const HomeScreen() : const LoginScreen(),
+      home: authState.isAuthenticated ? const WhatsAppMainScreen() : const LoginScreen(),
     );
   }
 }
