@@ -136,7 +136,7 @@ class HomeScreen extends ConsumerWidget {
                   icon: Icons.task_alt_rounded,
                   title: 'Tasks & EC',
                   subtitle: 'Reviews & Progress',
-                  color: Colors.emerald,
+                  color: Colors.teal,
                   onTap: () {},
                 ),
                 _buildModuleCard(
