@@ -7,7 +7,7 @@ class UserModel {
   final String? employeeCode;
   final String? profilePhotoUrl;
   final List<String> permissions;
-  final List<String> modules;
+  final Map<String, dynamic> modules;
 
   UserModel({
     required this.id,
@@ -23,17 +23,27 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final orbit = json['orbit'] as Map<String, dynamic>?;
-    final perms = (orbit?['permissions'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
-    final mods = (orbit?['modules'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
+
+    // permissions is a List<String>
+    List<String> perms = [];
+    if (orbit?['permissions'] is List) {
+      perms = (orbit!['permissions'] as List)
+          .map((e) => e.toString())
+          .toList();
+    }
+
+    // modules is a Map<String, dynamic> (e.g. {"sales_order": {"enabled": true}, ...})
+    Map<String, dynamic> mods = {};
+    if (orbit?['modules'] is Map) {
+      mods = Map<String, dynamic>.from(orbit!['modules'] as Map);
+    } else if (orbit?['modules'] is List) {
+      for (final item in (orbit!['modules'] as List)) {
+        mods[item.toString()] = true;
+      }
+    }
 
     return UserModel(
-      id: json['id'] as int,
+      id: json['id'] as int? ?? 0,
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       employeeId: json['employee_id'] as int?,
@@ -46,5 +56,11 @@ class UserModel {
   }
 
   bool can(String permission) => permissions.contains(permission);
-  bool hasModule(String module) => modules.contains(module);
+
+  bool hasModule(String module) {
+    final mod = modules[module];
+    if (mod is Map && mod['enabled'] == true) return true;
+    if (mod is bool && mod == true) return true;
+    return false;
+  }
 }
