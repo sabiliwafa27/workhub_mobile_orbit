@@ -1,0 +1,44 @@
+name: workhub_mobile
+description: "WorkHub / Orbit Mobile Client for Android and iOS"
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI & Presentation
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+
+  # State Management & DI
+  flutter_riverpod: ^2.6.1
+
+  # Networking & Serialization
+  dio: ^5.7.0
+  pretty_dio_logger: ^1.4.0
+
+  # Secure Storage & Cache
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.3.3
+
+  # Hardware, Location & Camera
+  geolocator: ^13.0.2
+  image_picker: ^1.1.2
+  local_auth: ^2.3.0
+  uuid: ^4.5.1
+
+  # Date & Utilities
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
