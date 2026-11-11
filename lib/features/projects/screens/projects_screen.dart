@@ -1,35 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/whatsapp_colors.dart';
+import '../providers/project_provider.dart';
 
-class ProjectItemModel {
-  final int id;
-  final String name;
-  final String description;
-  final int progress;
-  final int activeTasks;
-  final int completedTasks;
-  final String status;
-
-  ProjectItemModel({
-    required this.id,
-    required this.name,
-    required this.description,
-    required this.progress,
-    required this.activeTasks,
-    required this.completedTasks,
-    required this.status,
-  });
-}
-
-class ProjectsScreen extends StatefulWidget {
+class ProjectsScreen extends ConsumerStatefulWidget {
   const ProjectsScreen({super.key});
 
   @override
-  State<ProjectsScreen> createState() => _ProjectsScreenState();
+  ConsumerState<ProjectsScreen> createState() => _ProjectsScreenState();
 }
 
-class _ProjectsScreenState extends State<ProjectsScreen> {
-  final List<ProjectItemModel> _projects = [
+class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
+  final List<ProjectItemModel> _fallbackProjects = [
     ProjectItemModel(
       id: 1,
       name: 'Ekspansi Distribusi Area Jawa Timur 2026',
@@ -61,89 +43,174 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final projectState = ref.watch(projectNotifierProvider);
+    final displayProjects = projectState.projects.isNotEmpty ? projectState.projects : _fallbackProjects;
+
     return Scaffold(
       backgroundColor: WhatsAppColors.background,
-      body: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        itemCount: _projects.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final project = _projects[index];
-          return _buildProjectCard(project);
+      body: RefreshIndicator(
+        color: WhatsAppColors.tealGreen,
+        onRefresh: () async {
+          await ref.read(projectNotifierProvider.notifier).loadProjects();
         },
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          children: [
+            // Header Banner
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: const Color(0xFFEFF6FF),
+                    child: const Icon(
+                      Icons.hub_outlined,
+                      color: Color(0xFF1D4ED8),
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'WorkHub Projects',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: WhatsAppColors.titleText,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Energy of Creation & Strategic Milestones',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: WhatsAppColors.subtitleText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(color: WhatsAppColors.divider, height: 24),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: Text(
+                'COMPANY INITIATIVES (${displayProjects.length})',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                  color: WhatsAppColors.subtitleText,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: displayProjects.length,
+              separatorBuilder: (_, __) => const Divider(
+                color: WhatsAppColors.divider,
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+              ),
+              itemBuilder: (context, index) {
+                final project = displayProjects[index];
+                return _buildProjectCard(project);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildProjectCard(ProjectItemModel project) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.folder_shared_rounded, color: Color(0xFF2563EB), size: 20),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   project.name,
                   style: const TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     color: WhatsAppColors.titleText,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: WhatsAppColors.navIndicatorBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${project.progress}%',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: WhatsAppColors.darkGreen,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            project.description,
-            style: const TextStyle(fontSize: 12, color: WhatsAppColors.subtitleText),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Tasks: ${project.completedTasks}/${project.completedTasks + project.activeTasks}',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: WhatsAppColors.subtitleText),
+          if (project.description.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              project.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                color: WhatsAppColors.subtitleText,
               ),
-              Text(
-                '${project.progress}% Complete',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: WhatsAppColors.darkGreen),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
+            ),
+          ],
+          const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: project.progress / 100,
+              value: project.progress / 100.0,
+              backgroundColor: WhatsAppColors.chipBorder,
+              valueColor: const AlwaysStoppedAnimation<Color>(WhatsAppColors.tealGreen),
               minHeight: 6,
-              backgroundColor: const Color(0xFFE2E8F0),
-              valueColor: const AlwaysStoppedAnimation(WhatsAppColors.primaryGreen),
             ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.check_circle_outline, size: 14, color: WhatsAppColors.tealGreen),
+              const SizedBox(width: 4),
+              Text(
+                '${project.completedTasks} completed',
+                style: const TextStyle(fontSize: 12, color: WhatsAppColors.subtitleText),
+              ),
+              const SizedBox(width: 14),
+              const Icon(Icons.pending_actions, size: 14, color: WhatsAppColors.iconMuted),
+              const SizedBox(width: 4),
+              Text(
+                '${project.activeTasks} active',
+                style: const TextStyle(fontSize: 12, color: WhatsAppColors.subtitleText),
+              ),
+            ],
           ),
         ],
       ),

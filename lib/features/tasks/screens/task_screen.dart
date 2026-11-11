@@ -1,35 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/whatsapp_colors.dart';
+import '../providers/task_provider.dart';
 
-class TaskItemModel {
-  final int id;
-  final String title;
-  final String description;
-  final String status;
-  final int progressPercent;
-  final String dueDate;
-  final String priority;
-
-  TaskItemModel({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.status,
-    required this.progressPercent,
-    required this.dueDate,
-    required this.priority,
-  });
-}
-
-class TaskScreen extends StatefulWidget {
+class TaskScreen extends ConsumerStatefulWidget {
   const TaskScreen({super.key});
 
   @override
-  State<TaskScreen> createState() => _TaskScreenState();
+  ConsumerState<TaskScreen> createState() => _TaskScreenState();
 }
 
-class _TaskScreenState extends State<TaskScreen> {
-  final List<TaskItemModel> _tasks = [
+class _TaskScreenState extends ConsumerState<TaskScreen> {
+  final List<TaskItemModel> _fallbackTasks = [
     TaskItemModel(
       id: 912,
       title: 'Evaluasi Penetrasi Pasar Area Sidoarjo Timur',
@@ -61,64 +43,139 @@ class _TaskScreenState extends State<TaskScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final taskState = ref.watch(taskNotifierProvider);
+    final displayTasks = taskState.tasks.isNotEmpty ? taskState.tasks : _fallbackTasks;
+
     return Scaffold(
       backgroundColor: WhatsAppColors.background,
-      body: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        itemCount: _tasks.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final task = _tasks[index];
-          return _buildTaskCard(task);
+      body: RefreshIndicator(
+        color: WhatsAppColors.tealGreen,
+        onRefresh: () async {
+          await ref.read(taskNotifierProvider.notifier).loadTasks();
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: WhatsAppColors.fabBg,
-        elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.add_task_rounded, color: Colors.white, size: 22),
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          children: [
+            // Status Header Info
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: WhatsAppColors.navIndicatorBg,
+                        child: const Icon(
+                          Icons.assignment_outlined,
+                          color: WhatsAppColors.darkGreen,
+                          size: 26,
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: WhatsAppColors.badgeGreen,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.add, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'My Task Board',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: WhatsAppColors.titleText,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Tap + to create a new task',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: WhatsAppColors.subtitleText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(color: WhatsAppColors.divider, height: 24),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: Text(
+                'ACTIVE ASSIGNMENTS (${displayTasks.length})',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                  color: WhatsAppColors.subtitleText,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: displayTasks.length,
+              separatorBuilder: (_, __) => const Divider(
+                color: WhatsAppColors.divider,
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+              ),
+              itemBuilder: (context, index) {
+                final task = displayTasks[index];
+                return _buildTaskCard(task);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildTaskCard(TaskItemModel task) {
     Color priorityColor;
-    switch (task.priority) {
+    switch (task.priority.toLowerCase()) {
       case 'urgent':
-        priorityColor = Colors.red;
+        priorityColor = Colors.red.shade600;
         break;
       case 'high':
-        priorityColor = Colors.orange;
+        priorityColor = Colors.orange.shade800;
         break;
       default:
-        priorityColor = Colors.blue;
+        priorityColor = Colors.blue.shade700;
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: priorityColor.withValues(alpha: 0.1),
+                  color: priorityColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -130,47 +187,56 @@ class _TaskScreenState extends State<TaskScreen> {
                   ),
                 ),
               ),
-              Row(
-                children: [
-                  const Icon(Icons.event_outlined, size: 14, color: WhatsAppColors.timeText),
-                  const SizedBox(width: 4),
-                  Text(
-                    task.dueDate,
-                    style: const TextStyle(fontSize: 11, color: WhatsAppColors.timeText),
+              const Spacer(),
+              if (task.dueDate.isNotEmpty) ...[
+                const Icon(Icons.schedule, size: 14, color: WhatsAppColors.timeText),
+                const SizedBox(width: 4),
+                Text(
+                  task.dueDate,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: WhatsAppColors.timeText,
                   ),
-                ],
-              ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             task.title,
             style: const TextStyle(
               fontSize: 15,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
               color: WhatsAppColors.titleText,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            task.description,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: WhatsAppColors.subtitleText),
-          ),
-          const SizedBox(height: 12),
-
-          // Progress indicator
+          if (task.description.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              task.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                color: WhatsAppColors.subtitleText,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: task.progressPercent / 100,
+                    value: task.progressPercent / 100.0,
+                    backgroundColor: WhatsAppColors.chipBorder,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      task.progressPercent == 100
+                          ? WhatsAppColors.badgeGreen
+                          : WhatsAppColors.tealGreen,
+                    ),
                     minHeight: 6,
-                    backgroundColor: const Color(0xFFE2E8F0),
-                    valueColor: const AlwaysStoppedAnimation(WhatsAppColors.primaryGreen),
                   ),
                 ),
               ),
@@ -178,9 +244,9 @@ class _TaskScreenState extends State<TaskScreen> {
               Text(
                 '${task.progressPercent}%',
                 style: const TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: WhatsAppColors.darkGreen,
+                  color: WhatsAppColors.titleText,
                 ),
               ),
             ],
