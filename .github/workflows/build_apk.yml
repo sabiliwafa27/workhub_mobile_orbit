@@ -39,6 +39,15 @@ jobs:
       - name: Generate Missing Platform Files
         run: flutter create . --org net.kecapsawi --project-name workhub_mobile --platforms android,ios
 
+      - name: Patch Gradle Plugin Portal & MavenCentral
+        run: |
+          if [ -f android/settings.gradle.kts ]; then
+            sed -i '/pluginManagement {/a \    repositories {\n        google()\n        mavenCentral()\n        gradlePluginPortal()\n    }' android/settings.gradle.kts
+          fi
+          if [ -f android/settings.gradle ]; then
+            sed -i '/pluginManagement {/a \    repositories {\n        google()\n        mavenCentral()\n        gradlePluginPortal()\n    }' android/settings.gradle
+          fi
+
       - name: Get Dependencies
         run: flutter pub get
 
@@ -48,22 +57,19 @@ jobs:
       - name: Build Universal APK
         run: flutter build apk --release
 
-      - name: Upload APK Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: workhub-mobile-apk
-          path: build/app/outputs/flutter-apk/*.apk
-          retention-days: 14
-
-      - name: Create or Update GitHub Release
+      - name: Create Git Release & Upload APK
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "v1.0.${{ github.run_number }}"
-          name: "WorkHub Mobile v1.0.${{ github.run_number }}"
+          tag_name: v1.0.${{ github.run_number }}
+          name: WorkHub Mobile v1.0.${{ github.run_number }}
+          body: |
+            Automated build for WorkHub Mobile APK.
+            Commit: ${{ github.sha }}
           files: |
             build/app/outputs/flutter-apk/app-release.apk
-          generate_release_notes: true
-          make_latest: true
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
