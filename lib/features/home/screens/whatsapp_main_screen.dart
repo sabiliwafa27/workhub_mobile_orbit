@@ -129,7 +129,7 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                'Role: ${user?.roles.join(", ") ?? "Employee"}',
+                'Employee ID: ${user?.employeeCode ?? "EMP-${user?.id ?? 0}"}',
                 style: const TextStyle(
                   fontSize: 12,
                   color: WhatsAppColors.textSecondary,
