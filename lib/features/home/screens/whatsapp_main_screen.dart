@@ -176,7 +176,7 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
   String _getPageTitle() {
     switch (_currentIndex) {
       case 0:
-        return 'WhatsApp';
+        return 'WorkHub';
       case 1:
         return 'Inbox';
       case 2:
@@ -184,7 +184,7 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
       case 3:
         return 'Projects';
       default:
-        return 'WhatsApp';
+        return 'WorkHub';
     }
   }
 
