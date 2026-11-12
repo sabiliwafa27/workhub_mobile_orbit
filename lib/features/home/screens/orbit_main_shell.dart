@@ -97,7 +97,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
                 subtitle: const Text('Assign task or review request to team', style: TextStyle(fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  setState(() => _currentIndex = 2); // Switch to tasks tab
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TaskScreen()));
                 },
               ),
               ListTile(
@@ -113,7 +113,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
                 subtitle: const Text('Open WhatsApp discussion thread', style: TextStyle(fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  setState(() => _currentIndex = 3); // Switch to chats tab
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChatListScreen()));
                 },
               ),
               const SizedBox(height: 8),
@@ -262,9 +262,13 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     final inboxCount = ref.watch(inboxNotifierProvider).items.length;
 
     final pages = [
-      const EmployeeChatScreen(),
+      OrbitDashboardView(
+        onOpenSearch: () => setState(() => _currentIndex = 2),
+        onOpenNotifications: () => setState(() => _currentIndex = 1),
+        onOpenCheckIn: _showQuickActionSheet,
+      ),
       const InboxScreen(),
-      const TaskScreen(),
+      const EmployeeChatScreen(),
       const ProjectsScreen(),
     ];
 
@@ -315,8 +319,8 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
           // 4. Tasks
           _buildNavItem(
             index: 2,
-            icon: Icons.task_alt,
-            label: 'Tasks',
+            icon: Icons.chat_bubble_outline_rounded,
+            label: 'Chat',
           ),
 
           // 5. Discussions / Profile

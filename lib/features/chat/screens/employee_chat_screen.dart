@@ -40,17 +40,18 @@ class _EmployeeChatScreenState extends ConsumerState<EmployeeChatScreen> {
   Widget build(BuildContext context) {
     final filtered = chats.where((item) => item['name'].toString().toLowerCase().contains(search.text.toLowerCase()) && (!unread || (item['unread_count'] as num? ?? 0) > 0)).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Chats'), actions: [PopupMenuButton<String>(onSelected: (value) { if (value == 'logout') ref.read(authProvider.notifier).logout(); }, itemBuilder: (_) => [const PopupMenuItem(value: 'logout', child: Text('Log out'))])]),
+      backgroundColor: Colors.white,
+      appBar: AppBar(backgroundColor: Colors.white, elevation: 0, title: const Text('Chats', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF111B21))), actions: [PopupMenuButton<String>(onSelected: (value) { if (value == 'logout') ref.read(authProvider.notifier).logout(); }, itemBuilder: (_) => [const PopupMenuItem(value: 'logout', child: Text('Log out'))])]),
       floatingActionButton: FloatingActionButton(onPressed: () async {
         final selected = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(builder: (_) => const EmployeePickerScreen()));
         if (selected != null && mounted) open((selected['id'] as num).toInt(), selected['name'].toString());
-      }, child: const Icon(Icons.add)),
+      }, backgroundColor: const Color(0xFF25D366), foregroundColor: const Color(0xFF111B21), child: const Icon(Icons.add)),
       body: Column(children: [
-        Padding(padding: const EdgeInsets.all(12), child: TextField(controller: search, onChanged: (_) => setState(() {}), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search chats', border: OutlineInputBorder()))),
-        Row(children: [const SizedBox(width: 12), ChoiceChip(label: const Text('All'), selected: !unread, onSelected: (_) => setState(() => unread = false)), const SizedBox(width: 8), ChoiceChip(label: const Text('Unread'), selected: unread, onSelected: (_) => setState(() => unread = true))]),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: TextField(controller: search, onChanged: (_) => setState(() {}), decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Search', filled: true, fillColor: const Color(0xFFF0F2F5), contentPadding: const EdgeInsets.symmetric(vertical: 12), border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none)))),
+        Row(children: [const SizedBox(width: 16), ChoiceChip(label: const Text('All'), selected: !unread, selectedColor: const Color(0xFFD9FDD3), showCheckmark: false, onSelected: (_) => setState(() => unread = false)), const SizedBox(width: 8), ChoiceChip(label: const Text('Unread'), selected: unread, selectedColor: const Color(0xFFD9FDD3), showCheckmark: false, onSelected: (_) => setState(() => unread = true))]),
         Expanded(child: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: TextButton(onPressed: load, child: Text('$error Tap to retry.'))) : RefreshIndicator(onRefresh: load, child: filtered.isEmpty ? ListView(children: const [SizedBox(height: 100), Center(child: Text('No chats yet.'))]) : ListView.builder(itemCount: filtered.length, itemBuilder: (_, index) {
           final chat = filtered[index]; final count = (chat['unread_count'] as num? ?? 0).toInt();
-          return ListTile(leading: const CircleAvatar(child: Icon(Icons.person)), title: Text(chat['name'].toString()), subtitle: Text((chat['latest_message'] ?? '').toString(), maxLines: 1, overflow: TextOverflow.ellipsis), trailing: count > 0 ? CircleAvatar(radius: 12, child: Text('$count', style: const TextStyle(fontSize: 11))) : null, onTap: () => open((chat['id'] as num).toInt(), chat['name'].toString()));
+          return ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), leading: const CircleAvatar(radius: 25, backgroundColor: Color(0xFFDFE5E7), child: Icon(Icons.person, color: Colors.white)), title: Text(chat['name'].toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF111B21))), subtitle: Text((chat['latest_message'] ?? '').toString(), maxLines: 1, overflow: TextOverflow.ellipsis), trailing: count > 0 ? CircleAvatar(radius: 12, backgroundColor: const Color(0xFF25D366), child: Text('$count', style: const TextStyle(fontSize: 11, color: Color(0xFF111B21)))) : null, onTap: () => open((chat['id'] as num).toInt(), chat['name'].toString()));
         }))),
       ]),
     );

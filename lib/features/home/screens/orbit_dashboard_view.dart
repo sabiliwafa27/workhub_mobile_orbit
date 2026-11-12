@@ -10,6 +10,14 @@ import '../../tasks/providers/task_provider.dart';
 import '../../visits/models/visit_target_model.dart';
 import '../../visits/services/visit_service.dart';
 
+final _ecProgressProvider = FutureProvider<List<dynamic>>((ref) async {
+  final response = await ref.watch(apiClientProvider).dio.get('/ec/today');
+  if (response.data is! Map || response.data['data'] is! List) {
+    throw const FormatException('Unexpected EC response');
+  }
+  return response.data['data'] as List;
+});
+
 class OrbitDashboardView extends ConsumerStatefulWidget {
   final VoidCallback onOpenSearch;
   final VoidCallback onOpenNotifications;
@@ -37,6 +45,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     final userName = user?.name.split(' ').first ?? 'User';
     final taskState = ref.watch(taskNotifierProvider);
     final inboxState = ref.watch(inboxNotifierProvider);
+    final ecProgress = ref.watch(_ecProgressProvider);
     final visitTargetsAsync = ref.watch(visitTargetsNotifierProvider);
     final visitTargets = visitTargetsAsync.value ?? [];
 
@@ -49,6 +58,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           onRefresh: () async {
             await ref.read(taskNotifierProvider.notifier).loadTasks();
             await ref.read(inboxNotifierProvider.notifier).loadInbox();
+            ref.invalidate(_ecProgressProvider);
             ref.invalidate(visitTargetsNotifierProvider);
           },
           child: SingleChildScrollView(
@@ -83,6 +93,21 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
 
                 // 7. Live Assigned Tasks Section
                 _buildActiveTasksSection(taskState),
+                const SizedBox(height: 20),
+
+                const Text('Energy of Creation', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: OrbitColors.textNavy)),
+                const SizedBox(height: 10),
+                ecProgress.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (_, __) => TextButton(onPressed: () => ref.invalidate(_ecProgressProvider), child: const Text('Unable to load EC progress. Tap to retry.')),
+                  data: (items) => items.isEmpty
+                      ? const Text('No EC entries yet.')
+                      : Column(children: items.map((item) {
+                          final progress = item['current_progress'];
+                          final percentage = progress is Map ? (progress['percentage'] as num? ?? 0) : 0;
+                          return Card(child: ListTile(title: Text((item['title'] ?? '').toString()), subtitle: LinearProgressIndicator(value: (percentage / 100).clamp(0.0, 1.0).toDouble()), trailing: Text('$percentage%')));
+                        }).toList()),
+                ),
                 const SizedBox(height: 20),
 
                 // 8. Live Unified Inbox & Approvals Section
