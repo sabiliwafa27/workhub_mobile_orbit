@@ -32,9 +32,9 @@ class ReverbRealtimeService {
     try {
       final response = await _apiClient.dio.get('/realtime/config');
       final data = response.data['data'];
-      final host = data['host'] as String? ?? '10.11.2.49';
-      final port = data['port'] as int? ?? 8080;
-      final scheme = data['scheme'] as String? ?? 'http';
+      final host = data['host'] as String? ?? 'orbit.kecapsawi.net';
+      final port = data['port'] as int? ?? (data['scheme'] == 'https' ? 443 : 8080);
+      final scheme = data['scheme'] as String? ?? 'https';
       final appKey = data['app_key'] as String? ?? 'erplab_reverb_key';
 
       final wsScheme = scheme == 'https' ? 'wss' : 'ws';

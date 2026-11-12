@@ -22,6 +22,11 @@ class SecureStorageService {
 
   Future<String> getBaseUrl() async {
     final customUrl = await _storage.read(key: ApiConstants.baseUrlKey);
+    // If legacy local/staging url was saved previously in device storage, upgrade it to official orbit.kecapsawi.net
+    if (customUrl != null && (customUrl.contains('10.11.2.49') || customUrl.contains('rosyad-erplab'))) {
+      await saveBaseUrl(ApiConstants.defaultBaseUrl);
+      return ApiConstants.defaultBaseUrl;
+    }
     return customUrl ?? ApiConstants.defaultBaseUrl;
   }
 }
