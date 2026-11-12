@@ -24,12 +24,12 @@ class ProjectItemModel {
 
   factory ProjectItemModel.fromJson(Map<String, dynamic> json) {
     return ProjectItemModel(
-      id: json['id'] as int? ?? json['task_id'] as int? ?? 0,
-      name: json['name'] as String? ?? json['title'] as String? ?? json['subject'] as String? ?? 'Project',
-      description: json['description'] as String? ?? json['detail'] as String? ?? '',
+      id: json['id'] as int? ?? json['project_id'] as int? ?? 0,
+      name: json['name'] as String? ?? json['title'] as String? ?? 'Project',
+      description: json['description'] as String? ?? '',
       progress: json['progress'] as int? ?? json['progress_percent'] as int? ?? 0,
-      activeTasks: json['active_tasks'] as int? ?? 0,
-      completedTasks: json['completed_tasks'] as int? ?? 0,
+      activeTasks: json['active_tasks'] as int? ?? json['open_count'] as int? ?? 0,
+      completedTasks: json['completed_tasks'] as int? ?? json['completed_count'] as int? ?? 0,
       status: json['status'] as String? ?? 'active',
     );
   }
@@ -47,12 +47,9 @@ class ProjectRepository {
 
   Future<List<ProjectItemModel>> fetchProjects() async {
     try {
-      final response = await _apiClient.dio.get('/inbox/api/todos', queryParameters: {
-        'source': 'workhub_ec',
-        'view': 'incomplete',
-      });
+      final response = await _apiClient.dio.get('/projects');
       if (response.data is Map) {
-        final raw = response.data['tasks'] ?? response.data['incomplete'] ?? response.data['data'];
+        final raw = response.data['data'] ?? response.data['projects'] ?? response.data['tasks'];
         if (raw is List) {
           return raw.map((json) => ProjectItemModel.fromJson(json as Map<String, dynamic>)).toList();
         }
@@ -63,9 +60,9 @@ class ProjectRepository {
     }
   }
 
-  Future<Map<String, dynamic>?> fetchProjectDetail(int ecId) async {
+  Future<Map<String, dynamic>?> fetchProjectDetail(int projectId) async {
     try {
-      final response = await _apiClient.dio.get('/inbox/api/workhub-tasks/ec/$ecId/detail');
+      final response = await _apiClient.dio.get('/projects/$projectId/tasks');
       if (response.data is Map) {
         return response.data as Map<String, dynamic>;
       }

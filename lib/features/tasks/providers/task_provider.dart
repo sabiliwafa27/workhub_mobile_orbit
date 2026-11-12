@@ -47,13 +47,11 @@ class TaskRepository {
 
   Future<List<TaskItemModel>> fetchTasks({String status = 'all'}) async {
     try {
-      final view = status == 'complete' ? 'complete' : 'incomplete';
-      final response = await _apiClient.dio.get('/inbox/api/todos', queryParameters: {
-        'source': 'task',
-        'view': view,
+      final response = await _apiClient.dio.get('/tasks', queryParameters: {
+        'status': status,
       });
       if (response.data is Map) {
-        final raw = response.data['tasks'] ?? response.data['incomplete'] ?? response.data['complete'] ?? response.data['data'];
+        final raw = response.data['data'] ?? response.data['tasks'] ?? response.data['incomplete'];
         if (raw is List) {
           return raw.map((json) => TaskItemModel.fromJson(json as Map<String, dynamic>)).toList();
         }
@@ -66,7 +64,7 @@ class TaskRepository {
 
   Future<Map<String, dynamic>?> fetchTaskDetail(int taskId) async {
     try {
-      final response = await _apiClient.dio.get('/inbox/api/workhub-tasks/$taskId/payload');
+      final response = await _apiClient.dio.get('/tasks/$taskId/payload');
       if (response.data is Map) {
         return response.data as Map<String, dynamic>;
       }
@@ -78,7 +76,7 @@ class TaskRepository {
 
   Future<bool> completeTask(int taskId) async {
     try {
-      final response = await _apiClient.dio.post('/inbox/api/workhub-tasks/$taskId/complete');
+      final response = await _apiClient.dio.post('/tasks/$taskId/complete');
       return response.statusCode == 200;
     } catch (_) {
       return false;
@@ -88,7 +86,7 @@ class TaskRepository {
   Future<bool> requestReview(int taskId, {String? notes}) async {
     try {
       final response = await _apiClient.dio.post(
-        '/inbox/api/workhub-tasks/$taskId/request-review',
+        '/tasks/$taskId/request-review',
         data: notes != null ? {'notes': notes} : null,
       );
       return response.statusCode == 200;

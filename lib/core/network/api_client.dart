@@ -33,12 +33,19 @@ class ApiClient {
           if (!path.startsWith('/')) {
             path = '/$path';
           }
-          if (!path.startsWith('/api/') && !path.startsWith('/workhub/') && !path.startsWith('/inbox/')) {
+          if (!path.startsWith('/api/') && !path.startsWith('/workhub/')) {
             if (path.startsWith('/auth') ||
                 path.startsWith('/realtime') ||
                 path.startsWith('/fcm-device-tokens')) {
               path = '/api/v1$path';
-            } else if (path.startsWith('/conversations') ||
+            } else if (path.startsWith('/inbox')) {
+              // Normalize /inbox/api/todos or /inbox/todos -> /api/v1/inbox/todos
+              final clean = path.replaceFirst('/inbox/api', '').replaceFirst('/inbox', '');
+              path = '/api/v1/inbox$clean';
+            } else if (path.startsWith('/tasks') ||
+                path.startsWith('/projects') ||
+                path.startsWith('/ec') ||
+                path.startsWith('/conversations') ||
                 path.startsWith('/visit') ||
                 path.startsWith('/check-ins') ||
                 path.startsWith('/sales-orders')) {
