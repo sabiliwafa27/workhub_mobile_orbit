@@ -25,11 +25,11 @@ class TaskItemModel {
   factory TaskItemModel.fromJson(Map<String, dynamic> json) {
     return TaskItemModel(
       id: json['task_id'] as int? ?? json['id'] as int? ?? 0,
-      title: json['title'] as String? ?? 'Task',
-      description: json['description'] as String? ?? '',
+      title: json['title'] as String? ?? json['subject'] as String? ?? 'Task',
+      description: json['description'] as String? ?? json['detail'] as String? ?? '',
       status: json['status'] as String? ?? 'in_progress',
       progressPercent: json['progress_percent'] as int? ?? json['progress'] as int? ?? 0,
-      dueDate: json['due_date'] as String? ?? '',
+      dueDate: json['due_date'] as String? ?? json['created_at'] as String? ?? '',
       priority: json['priority'] as String? ?? 'medium',
     );
   }
@@ -45,16 +45,55 @@ class TaskRepository {
 
   TaskRepository(this._apiClient);
 
-  Future<List<TaskItemModel>> fetchTasks() async {
+  Future<List<TaskItemModel>> fetchTasks({String status = 'all'}) async {
     try {
-      final response = await _apiClient.dio.get('/sso/inbox/v2');
-      if (response.data is Map && response.data['data'] is List) {
-        final list = response.data['data'] as List;
-        return list.map((json) => TaskItemModel.fromJson(json as Map<String, dynamic>)).toList();
+      final view = status == 'complete' ? 'complete' : 'incomplete';
+      final response = await _apiClient.dio.get('/inbox/api/todos', queryParameters: {
+        'source': 'task',
+        'view': view,
+      });
+      if (response.data is Map) {
+        final raw = response.data['tasks'] ?? response.data['incomplete'] ?? response.data['complete'] ?? response.data['data'];
+        if (raw is List) {
+          return raw.map((json) => TaskItemModel.fromJson(json as Map<String, dynamic>)).toList();
+        }
       }
       return [];
     } catch (_) {
       return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchTaskDetail(int taskId) async {
+    try {
+      final response = await _apiClient.dio.get('/inbox/api/workhub-tasks/$taskId/payload');
+      if (response.data is Map) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> completeTask(int taskId) async {
+    try {
+      final response = await _apiClient.dio.post('/inbox/api/workhub-tasks/$taskId/complete');
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> requestReview(int taskId, {String? notes}) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '/inbox/api/workhub-tasks/$taskId/request-review',
+        data: notes != null ? {'notes': notes} : null,
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 }
@@ -93,14 +132,19 @@ class TaskNotifier extends StateNotifier<TaskListState> {
     _setupRealtime();
   }
 
-  Future<void> loadTasks() async {
+  Future<void> loadTasks({String status = 'all'}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final items = await _repo.fetchTasks();
+      final items = await _repo.fetchTasks(status: status);
       state = state.copyWith(tasks: items, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
+  }
+
+  Future<void> completeTask(int taskId) async {
+    await _repo.completeTask(taskId);
+    await loadTasks();
   }
 
   void _setupRealtime() {

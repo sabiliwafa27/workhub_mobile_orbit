@@ -28,6 +28,24 @@ class ApiClient {
             options.baseUrl = await storage.getBaseUrl();
           }
 
+          // Ensure proper path prefixing for standard API routes
+          var path = options.path;
+          if (!path.startsWith('/')) {
+            path = '/$path';
+          }
+          if (!path.startsWith('/api/') && !path.startsWith('/inbox/')) {
+            if (path.startsWith('/auth') ||
+                path.startsWith('/conversations') ||
+                path.startsWith('/visit') ||
+                path.startsWith('/check-ins') ||
+                path.startsWith('/sales-orders') ||
+                path.startsWith('/realtime') ||
+                path.startsWith('/fcm-device-tokens')) {
+              path = '/api/v1$path';
+            }
+          }
+          options.path = path;
+
           // Attach Bearer Token
           final token = await storage.getToken();
           if (token != null && token.isNotEmpty) {
@@ -36,7 +54,6 @@ class ApiClient {
 
           // Idempotency-Key header for sensitive POST mutations
           if (options.method.toUpperCase() == 'POST') {
-            final path = options.path;
             if (path.contains('/check-ins') || path.contains('/sales-orders')) {
               options.headers.putIfAbsent(
                 'Idempotency-Key',

@@ -24,9 +24,9 @@ class ProjectItemModel {
 
   factory ProjectItemModel.fromJson(Map<String, dynamic> json) {
     return ProjectItemModel(
-      id: json['id'] as int? ?? 0,
-      name: json['name'] as String? ?? json['title'] as String? ?? 'Project',
-      description: json['description'] as String? ?? '',
+      id: json['id'] as int? ?? json['task_id'] as int? ?? 0,
+      name: json['name'] as String? ?? json['title'] as String? ?? json['subject'] as String? ?? 'Project',
+      description: json['description'] as String? ?? json['detail'] as String? ?? '',
       progress: json['progress'] as int? ?? json['progress_percent'] as int? ?? 0,
       activeTasks: json['active_tasks'] as int? ?? 0,
       completedTasks: json['completed_tasks'] as int? ?? 0,
@@ -47,14 +47,31 @@ class ProjectRepository {
 
   Future<List<ProjectItemModel>> fetchProjects() async {
     try {
-      final response = await _apiClient.dio.get('/sso/inbox/ec');
-      if (response.data is Map && response.data['data'] is List) {
-        final list = response.data['data'] as List;
-        return list.map((json) => ProjectItemModel.fromJson(json as Map<String, dynamic>)).toList();
+      final response = await _apiClient.dio.get('/inbox/api/todos', queryParameters: {
+        'source': 'workhub_ec',
+        'view': 'incomplete',
+      });
+      if (response.data is Map) {
+        final raw = response.data['tasks'] ?? response.data['incomplete'] ?? response.data['data'];
+        if (raw is List) {
+          return raw.map((json) => ProjectItemModel.fromJson(json as Map<String, dynamic>)).toList();
+        }
       }
       return [];
     } catch (_) {
       return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchProjectDetail(int ecId) async {
+    try {
+      final response = await _apiClient.dio.get('/inbox/api/workhub-tasks/ec/$ecId/detail');
+      if (response.data is Map) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 }
@@ -110,7 +127,7 @@ class ProjectNotifier extends StateNotifier<ProjectListState> {
       });
     }
 
-    _reverb.subscribe('project-updates', (eventData) {
+    _reverb.subscribe('ec-updates', (eventData) {
       loadProjects();
     });
   }

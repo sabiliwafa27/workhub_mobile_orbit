@@ -16,14 +16,35 @@ class InboxRepository {
 
   Future<List<InboxItemModel>> fetchTodos({String status = 'pending'}) async {
     try {
-      final response = await _apiClient.dio.get('/inbox/api/todos', queryParameters: {'status': status});
-      if (response.data is Map && response.data['data'] is List) {
-        final list = response.data['data'] as List;
-        return list.map((json) => InboxItemModel.fromJson(json as Map<String, dynamic>)).toList();
+      final view = status == 'complete' ? 'complete' : 'incomplete';
+      final response = await _apiClient.dio.get('/inbox/api/todos', queryParameters: {'view': view});
+      if (response.data is Map) {
+        final raw = response.data['tasks'] ?? response.data['incomplete'] ?? response.data['complete'] ?? response.data['data'];
+        if (raw is List) {
+          return raw.map((json) => InboxItemModel.fromJson(json as Map<String, dynamic>)).toList();
+        }
       }
       return [];
     } catch (_) {
       return [];
+    }
+  }
+
+  Future<bool> markRead(String module, String subjectKey) async {
+    try {
+      final response = await _apiClient.dio.post('/inbox/api/$module/$subjectKey/mark-read');
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> completeTodo(String module, String subjectKey) async {
+    try {
+      final response = await _apiClient.dio.post('/inbox/api/$module/$subjectKey/complete');
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 }
@@ -69,6 +90,13 @@ class InboxNotifier extends StateNotifier<InboxListState> {
       state = state.copyWith(items: todos, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> completeItem(InboxItemModel item) async {
+    if (item.moduleCode != null && item.subjectKey != null) {
+      await _repo.completeTodo(item.moduleCode!, item.subjectKey!);
+      await loadInbox();
     }
   }
 
