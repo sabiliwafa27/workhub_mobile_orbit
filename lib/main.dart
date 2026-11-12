@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/theme/erp_colors.dart';
-import 'core/theme/whatsapp_colors.dart';
+import 'core/theme/orbit_theme.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
-import 'features/home/screens/whatsapp_main_screen.dart';
+import 'features/home/screens/orbit_main_shell.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,18 +22,10 @@ class WorkHubApp extends ConsumerWidget {
     final authState = ref.watch(authProvider);
 
     return MaterialApp(
-      title: 'WorkHub Mobile',
+      title: 'Orbit WorkHub',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: ErpColors.primaryNavy,
-          primary: ErpColors.primaryNavy,
-        ),
-        scaffoldBackgroundColor: ErpColors.scaffoldBackground,
-        fontFamily: 'Roboto',
-      ),
-      home: authState.isAuthenticated ? const WhatsAppMainScreen() : const LoginScreen(),
+      theme: OrbitTheme.lightTheme,
+      home: authState.isAuthenticated ? const OrbitMainShell() : const LoginScreen(),
     );
   }
 }

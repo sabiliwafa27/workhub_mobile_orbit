@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/whatsapp_colors.dart';
+import '../../../../core/theme/orbit_theme.dart';
 import '../models/inbox_item_model.dart';
 import '../providers/inbox_provider.dart';
 
@@ -20,6 +20,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     'Logistic In',
     'Fleet Approval',
     'Sales Order',
+    'Tasks',
   ];
 
   final List<InboxItemModel> _fallbackItems = [
@@ -31,6 +32,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       status: 'pending_approval',
       createdAt: '10:45 AM',
       subtitle: 'Menunggu verifikasi security di pos gerbang utama.',
+      moduleCode: 'guest_book',
+      subjectKey: '101',
     ),
     InboxItemModel(
       id: 102,
@@ -40,6 +43,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       status: 'assigned',
       createdAt: '09:15 AM',
       subtitle: 'Truk N 8920 UY tiba di loading bay 3.',
+      moduleCode: 'logistic_in',
+      subjectKey: '102',
     ),
     InboxItemModel(
       id: 103,
@@ -49,6 +54,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       status: 'pending',
       createdAt: 'Yesterday',
       subtitle: 'Klaim struk Pertamina Rp 650.000.',
+      moduleCode: 'fleet',
+      subjectKey: '103',
     ),
     InboxItemModel(
       id: 104,
@@ -58,6 +65,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       status: 'pending_revision',
       createdAt: 'Yesterday',
       subtitle: 'Koreksi kuantiti kecap botol 135ml.',
+      moduleCode: 'sales_order',
+      subjectKey: '104',
     ),
   ];
 
@@ -71,18 +80,35 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         : rawItems.where((item) => item.sourceLabel.toLowerCase() == _selectedSource.toLowerCase()).toList();
 
     return Scaffold(
-      backgroundColor: WhatsAppColors.background,
+      backgroundColor: OrbitColors.scaffoldBackground,
+      appBar: AppBar(
+        title: const Text(
+          'Unified Inbox',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: OrbitColors.textNavy,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: OrbitColors.textNavy),
+            onPressed: () {
+              ref.read(inboxNotifierProvider.notifier).loadInbox();
+            },
+          ),
+        ],
+      ),
       body: RefreshIndicator(
-        color: WhatsAppColors.tealGreen,
+        color: OrbitColors.primaryNavy,
         onRefresh: () async {
           await ref.read(inboxNotifierProvider.notifier).loadInbox();
         },
         child: Column(
           children: [
-            // Source Filter Chips
-            Container(
-              height: 50,
-              padding: const EdgeInsets.symmetric(vertical: 6),
+            // Filter Pills
+            SizedBox(
+              height: 44,
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 scrollDirection: Axis.horizontal,
@@ -92,32 +118,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                   final source = _sourceFilters[index];
                   final isSelected = _selectedSource == source;
                   return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedSource = source;
-                      });
-                    },
+                    onTap: () => setState(() => _selectedSource = source),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? WhatsAppColors.navIndicatorBg
-                            : WhatsAppColors.chipBg,
-                        borderRadius: BorderRadius.circular(20),
+                        color: isSelected ? OrbitColors.pillDark : Colors.white,
+                        borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: isSelected
-                              ? WhatsAppColors.tealGreen.withOpacity(0.3)
-                              : WhatsAppColors.chipBorder,
+                          color: isSelected ? OrbitColors.pillDark : OrbitColors.cardBorder,
                         ),
                       ),
                       child: Text(
                         source,
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                          color: isSelected
-                              ? WhatsAppColors.darkGreen
-                              : WhatsAppColors.chipText,
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? Colors.white : OrbitColors.textSecondary,
                         ),
                       ),
                     ),
@@ -125,23 +141,30 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 },
               ),
             ),
+            const SizedBox(height: 12),
 
-            const Divider(color: WhatsAppColors.divider, height: 1),
-
-            // Inbox List
+            // Items List
             Expanded(
-              child: ListView.separated(
-                itemCount: filteredItems.length,
-                separatorBuilder: (_, __) => const Divider(
-                  color: WhatsAppColors.divider,
-                  height: 1,
-                  indent: 72,
-                ),
-                itemBuilder: (context, index) {
-                  final item = filteredItems[index];
-                  return _buildInboxItem(item);
-                },
-              ),
+              child: filteredItems.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.inbox_outlined, size: 48, color: OrbitColors.textMuted),
+                          SizedBox(height: 12),
+                          Text('No pending items in inbox', style: TextStyle(color: OrbitColors.textSecondary)),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 90),
+                      itemCount: filteredItems.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final item = filteredItems[index];
+                        return _buildInboxCard(item);
+                      },
+                    ),
             ),
           ],
         ),
@@ -149,103 +172,103 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     );
   }
 
-  Widget _buildInboxItem(InboxItemModel item) {
-    IconData icon;
-    Color iconColor;
-    Color iconBg;
+  Widget _buildInboxCard(InboxItemModel item) {
+    Color tagBg = OrbitColors.bubbleBlue;
+    Color tagColor = OrbitColors.primaryNavy;
 
-    switch (item.source) {
-      case 'guest_book':
-        icon = Icons.badge_outlined;
-        iconColor = Colors.orange.shade700;
-        iconBg = Colors.orange.shade50;
-        break;
-      case 'logistic_in':
-        icon = Icons.local_shipping_outlined;
-        iconColor = Colors.blue.shade700;
-        iconBg = Colors.blue.shade50;
-        break;
-      case 'fleet':
-        icon = Icons.local_gas_station_outlined;
-        iconColor = Colors.green.shade700;
-        iconBg = Colors.green.shade50;
-        break;
-      case 'sales_order':
-        icon = Icons.receipt_long_outlined;
-        iconColor = Colors.purple.shade700;
-        iconBg = Colors.purple.shade50;
-        break;
-      default:
-        icon = Icons.task_alt_outlined;
-        iconColor = WhatsAppColors.darkGreen;
-        iconBg = WhatsAppColors.navIndicatorBg;
+    if (item.source.contains('guest')) {
+      tagBg = const Color(0xFFFEF3C7);
+      tagColor = const Color(0xFFB45309);
+    } else if (item.source.contains('logistic')) {
+      tagBg = const Color(0xFFDCFCE7);
+      tagColor = const Color(0xFF15803D);
+    } else if (item.source.contains('fleet')) {
+      tagBg = OrbitColors.coralIconBg;
+      tagColor = OrbitColors.coralIcon;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      child: Row(
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: OrbitColors.cardBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: iconBg,
-            child: Icon(icon, color: iconColor, size: 22),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: tagBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  item.sourceLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: tagColor,
+                  ),
+                ),
+              ),
+              Text(
+                item.createdAt,
+                style: const TextStyle(fontSize: 11, color: OrbitColors.textMuted),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: iconBg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        item.sourceLabel,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: iconColor,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      item.createdAt,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: WhatsAppColors.timeText,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: WhatsAppColors.titleText,
-                  ),
-                ),
-                if (item.subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    item.subtitle!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: WhatsAppColors.subtitleText,
-                    ),
-                  ),
-                ],
-              ],
+          const SizedBox(height: 8),
+          Text(
+            item.title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: OrbitColors.textNavy,
             ),
+          ),
+          if (item.subtitle != null && item.subtitle!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              item.subtitle!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: OrbitColors.textSecondary,
+                height: 1.3,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref.read(inboxNotifierProvider.notifier).completeItem(item);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Item marked as completed.'), duration: Duration(seconds: 1)),
+                  );
+                },
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text('Complete', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: OrbitColors.kpiGreen,
+                  side: const BorderSide(color: OrbitColors.kpiGreen),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                ),
+              ),
+            ],
           ),
         ],
       ),

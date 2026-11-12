@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/whatsapp_colors.dart';
+import '../../../../core/theme/orbit_theme.dart';
 import '../models/chat_item_model.dart';
 import '../providers/chat_provider.dart';
 
@@ -15,77 +15,44 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   String _selectedFilter = 'All';
   final TextEditingController _searchController = TextEditingController();
 
-  final List<String> _filters = ['All', 'Favorites', 'WORKING', 'Follow up', '+'];
+  final List<String> _filters = ['All', 'Favorites', 'WORKING', 'Follow up'];
 
-  // Fallback demo chats to show nice WhatsApp layout when offline or empty
   final List<ChatItemModel> _fallbackChats = [
     ChatItemModel(
       id: '1',
-      title: '@tokotechkekinian (You)',
-      lastMessage: 'Hermes is shutting down for scheduled maintenance...',
+      title: 'Toko Berkah Jaya',
+      lastMessage: 'Kirim kecap botol 275ml 10 karton ya mas...',
       time: '11:32',
       isPinned: true,
-      tag: null,
+      tag: 'WORKING',
       isGroup: false,
-      senderPrefix: 'Hertod',
+      senderPrefix: 'Pak Hendra',
     ),
     ChatItemModel(
       id: '2',
-      title: 'gatsby',
-      lastMessage: 'Photo',
+      title: 'Gudang Waru Logistic',
+      lastMessage: 'Penerimaan kedelai selesai dibongkar di bay 3.',
       time: 'Yesterday',
       isPinned: true,
       tag: null,
       isGroup: true,
-      senderPrefix: 'siwa',
+      senderPrefix: 'Mas Vito',
     ),
     ChatItemModel(
       id: '3',
-      title: 'Tukang Gambar',
-      lastMessage: 'nggh',
+      title: 'Toko Sri Rejeki Sidoarjo',
+      lastMessage: 'Sudah ditransfer untuk faktur kemarin.',
       time: '12:19',
-      tag: 'WORKING',
-      isGroup: true,
-      senderPrefix: 'Mas Ilyas',
+      tag: 'Follow up',
+      isGroup: false,
+      senderPrefix: 'Bu Sri',
     ),
     ChatItemModel(
       id: '4',
       title: 'Mas Rudy PFI',
-      lastMessage: '3 orang saja',
+      lastMessage: 'Jadwalkan review penetrasi pasar Sidoarjo timur.',
       time: '09:25',
       isGroup: false,
-    ),
-    ChatItemModel(
-      id: '5',
-      title: 'PFI',
-      lastMessage: 'Pagi Semua, menginformasikan kembali untuk b...',
-      time: '08:28',
-      tag: 'WORKING',
-      isGroup: true,
-      senderPrefix: 'Mas Vito',
-    ),
-    ChatItemModel(
-      id: '6',
-      title: 'Sawi Dojo',
-      lastMessage: 'Jumat 6 Nov',
-      time: 'Yesterday',
-      isGroup: true,
-      senderPrefix: 'Mas Vito',
-    ),
-    ChatItemModel(
-      id: '7',
-      title: 'Rahmad Bagus DM',
-      lastMessage: 'Oke',
-      time: 'Yesterday',
-      isGroup: false,
-    ),
-    ChatItemModel(
-      id: '8',
-      title: 'IT Guys',
-      lastMessage: 'kami sudah siap, pak',
-      time: 'Yesterday',
-      isGroup: true,
-      senderPrefix: 'Mas Dhika',
     ),
   ];
 
@@ -95,9 +62,30 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final displayChats = chatState.chats.isNotEmpty ? chatState.chats : _fallbackChats;
 
     return Scaffold(
-      backgroundColor: WhatsAppColors.background,
+      backgroundColor: OrbitColors.scaffoldBackground,
+      appBar: AppBar(
+        title: const Text(
+          'Customer Discussions',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: OrbitColors.textNavy,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: OrbitColors.textNavy),
+            onPressed: () {
+              ref.read(chatNotifierProvider.notifier).loadChats(
+                search: _searchController.text,
+                filter: _selectedFilter == 'All' ? null : _selectedFilter.toLowerCase(),
+              );
+            },
+          ),
+        ],
+      ),
       body: RefreshIndicator(
-        color: WhatsAppColors.tealGreen,
+        color: OrbitColors.primaryNavy,
         onRefresh: () async {
           await ref.read(chatNotifierProvider.notifier).loadChats(
             search: _searchController.text,
@@ -110,37 +98,46 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Container(
-                height: 44,
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: WhatsAppColors.searchBarBg,
-                  borderRadius: BorderRadius.circular(24),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: OrbitColors.cardBorder),
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(fontSize: 15),
-                  onChanged: (val) {
-                    ref.read(chatNotifierProvider.notifier).loadChats(
-                      search: val,
-                      filter: _selectedFilter == 'All' ? null : _selectedFilter.toLowerCase(),
-                    );
-                  },
-                  decoration: const InputDecoration(
-                    hintText: 'Search...',
-                    hintStyle: TextStyle(
-                      color: WhatsAppColors.textSecondary,
-                      fontSize: 15,
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, color: OrbitColors.textMuted, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        style: const TextStyle(fontSize: 14),
+                        onChanged: (val) {
+                          ref.read(chatNotifierProvider.notifier).loadChats(
+                            search: val,
+                            filter: _selectedFilter == 'All' ? null : _selectedFilter.toLowerCase(),
+                          );
+                        },
+                        decoration: const InputDecoration(
+                          hintText: 'Search conversations...',
+                          hintStyle: TextStyle(
+                            color: OrbitColors.textMuted,
+                            fontSize: 13,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
+                      ),
                     ),
-                    prefixIcon: Icon(Icons.search, color: WhatsAppColors.iconMuted, size: 20),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 12),
-                  ),
+                  ],
                 ),
               ),
             ),
 
             // Horizontal Filter Chips
             SizedBox(
-              height: 40,
+              height: 42,
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 scrollDirection: Axis.horizontal,
@@ -150,128 +147,44 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   final filter = _filters[index];
                   final isSelected = _selectedFilter == filter;
 
-                  if (filter == '+') {
-                    return Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: WhatsAppColors.chipBorder),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.add, size: 20, color: WhatsAppColors.chipText),
-                      ),
-                    );
-                  }
-
                   return GestureDetector(
                     onTap: () {
-                      setState(() {
-                        _selectedFilter = filter;
-                      });
+                      setState(() => _selectedFilter = filter);
                       ref.read(chatNotifierProvider.notifier).loadChats(
                         search: _searchController.text,
                         filter: filter == 'All' ? null : filter.toLowerCase(),
                       );
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? WhatsAppColors.navIndicatorBg
-                            : WhatsAppColors.chipBg,
-                        borderRadius: BorderRadius.circular(20),
+                        color: isSelected ? OrbitColors.pillDark : Colors.white,
+                        borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: isSelected
-                              ? WhatsAppColors.tealGreen.withOpacity(0.3)
-                              : WhatsAppColors.chipBorder,
+                          color: isSelected ? OrbitColors.pillDark : OrbitColors.cardBorder,
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (filter == 'WORKING') ...[
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: WhatsAppColors.workingBlue,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          if (filter == 'Follow up') ...[
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: WhatsAppColors.followUpGreen,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          Text(
-                            filter,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              color: isSelected
-                                  ? WhatsAppColors.darkGreen
-                                  : WhatsAppColors.chipText,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        filter,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? Colors.white : OrbitColors.textSecondary,
+                        ),
                       ),
                     ),
                   );
                 },
               ),
             ),
+            const SizedBox(height: 10),
 
-            const SizedBox(height: 8),
-
-            // Archived Banner
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                children: const [
-                  Icon(Icons.archive_outlined, color: WhatsAppColors.iconMuted, size: 20),
-                  SizedBox(width: 24),
-                  Expanded(
-                    child: Text(
-                      'Archived',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: WhatsAppColors.titleText,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '30',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: WhatsAppColors.tealGreen,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Divider(color: WhatsAppColors.divider, height: 1, indent: 64),
-
-            // Chat List
+            // Chats List
             Expanded(
               child: ListView.separated(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 90),
                 itemCount: displayChats.length,
-                separatorBuilder: (_, __) => const Divider(
-                  color: WhatsAppColors.divider,
-                  height: 1,
-                  indent: 72,
-                ),
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
                   final chat = displayChats[index];
                   return _buildChatItem(chat);
@@ -281,51 +194,57 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: WhatsAppColors.fabBg,
-        elevation: 3,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Icon(
-          Icons.add_comment_rounded,
-          color: WhatsAppColors.fabIcon,
-        ),
-      ),
     );
   }
 
   Widget _buildChatItem(ChatItemModel chat) {
-    return InkWell(
-      onTap: () {
-        ref.read(chatRepositoryProvider).markRead(chat.id);
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: OrbitColors.cardBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () {
+          ref.read(chatRepositoryProvider).markRead(chat.id);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Opening thread with ${chat.title}...'),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        },
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Avatar
             CircleAvatar(
-              radius: 24,
+              radius: 22,
               backgroundColor: chat.isGroup
-                  ? const Color(0xFFFFE0D2)
-                  : (chat.title.contains('PFI') ? const Color(0xFFF0F4F8) : const Color(0xFFE2E8F0)),
+                  ? OrbitColors.coralIconBg
+                  : OrbitColors.bubbleBlue,
               child: chat.isGroup
-                  ? const Icon(Icons.group, color: Color(0xFFC2410C), size: 24)
+                  ? const Icon(Icons.group, color: OrbitColors.coralIcon, size: 22)
                   : Text(
                       chat.title.isNotEmpty ? chat.title[0].toUpperCase() : 'C',
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: WhatsAppColors.titleText,
+                        color: OrbitColors.primaryNavy,
                       ),
                     ),
             ),
             const SizedBox(width: 12),
 
-            // Content
+            // Chat Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,19 +258,17 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: WhatsAppColors.titleText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: OrbitColors.textNavy,
                           ),
                         ),
                       ),
                       Text(
                         chat.time,
                         style: TextStyle(
-                          fontSize: 12,
-                          color: chat.unreadCount > 0
-                              ? WhatsAppColors.tealGreen
-                              : WhatsAppColors.timeText,
+                          fontSize: 11,
+                          color: chat.unreadCount > 0 ? OrbitColors.brandOrange : OrbitColors.textMuted,
                           fontWeight: chat.unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
@@ -360,21 +277,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      if (chat.isRead && !chat.isGroup) ...[
-                        const Icon(
-                          Icons.done_all,
-                          size: 16,
-                          color: WhatsAppColors.checkBlue,
-                        ),
-                        const SizedBox(width: 4),
-                      ],
                       if (chat.senderPrefix != null) ...[
                         Text(
                           '${chat.senderPrefix}: ',
                           style: const TextStyle(
-                            fontSize: 14,
-                            color: WhatsAppColors.subtitleText,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                            color: OrbitColors.textSecondary,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -384,50 +293,24 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 14,
-                            color: WhatsAppColors.subtitleText,
+                            fontSize: 12,
+                            color: OrbitColors.textSecondary,
                           ),
                         ),
                       ),
-                      if (chat.tag != null) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDBEAFE),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            chat.tag!,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1D4ED8),
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (chat.isPinned) ...[
-                        const SizedBox(width: 6),
-                        const Icon(
-                          Icons.push_pin,
-                          size: 16,
-                          color: WhatsAppColors.iconMuted,
-                        ),
-                      ],
                       if (chat.unreadCount > 0) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.all(5),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: const BoxDecoration(
-                            color: WhatsAppColors.badgeGreen,
+                            color: OrbitColors.accentCoral,
                             shape: BoxShape.circle,
                           ),
                           child: Text(
                             chat.unreadCount.toString(),
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

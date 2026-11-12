@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/whatsapp_colors.dart';
+import '../../../../core/theme/orbit_theme.dart';
 import '../providers/task_provider.dart';
 
 class TaskScreen extends ConsumerStatefulWidget {
@@ -47,64 +47,75 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     final displayTasks = taskState.tasks.isNotEmpty ? taskState.tasks : _fallbackTasks;
 
     return Scaffold(
-      backgroundColor: WhatsAppColors.background,
+      backgroundColor: OrbitColors.scaffoldBackground,
+      appBar: AppBar(
+        title: const Text(
+          'Task Board',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: OrbitColors.textNavy,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: OrbitColors.textNavy),
+            onPressed: () {
+              ref.read(taskNotifierProvider.notifier).loadTasks();
+            },
+          ),
+        ],
+      ),
       body: RefreshIndicator(
-        color: WhatsAppColors.tealGreen,
+        color: OrbitColors.primaryNavy,
         onRefresh: () async {
           await ref.read(taskNotifierProvider.notifier).loadTasks();
         },
         child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 90),
           children: [
             // Status Header Info
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: OrbitColors.cardBorder),
+              ),
               child: Row(
                 children: [
-                  Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: WhatsAppColors.navIndicatorBg,
-                        child: const Icon(
-                          Icons.assignment_outlined,
-                          color: WhatsAppColors.darkGreen,
-                          size: 26,
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: WhatsAppColors.badgeGreen,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.add, size: 14, color: Colors.white),
-                        ),
-                      ),
-                    ],
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: OrbitColors.bubbleBlue,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.assignment_outlined,
+                      color: OrbitColors.primaryNavy,
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'My Task Board',
+                      children: [
+                        const Text(
+                          'Active Assigned Tasks',
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: WhatsAppColors.titleText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: OrbitColors.textNavy,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          'Tap + to create a new task',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: WhatsAppColors.subtitleText,
+                          '${displayTasks.length} task${displayTasks.length == 1 ? '' : 's'} in progress',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: OrbitColors.textSecondary,
                           ),
                         ),
                       ],
@@ -113,39 +124,13 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 14),
 
-            const Divider(color: WhatsAppColors.divider, height: 24),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-              child: Text(
-                'ACTIVE ASSIGNMENTS (${displayTasks.length})',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                  color: WhatsAppColors.subtitleText,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: displayTasks.length,
-              separatorBuilder: (_, __) => const Divider(
-                color: WhatsAppColors.divider,
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-              ),
-              itemBuilder: (context, index) {
-                final task = displayTasks[index];
-                return _buildTaskCard(task);
-              },
-            ),
+            // Tasks List
+            ...displayTasks.map((task) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: _buildTaskCard(task),
+                )),
           ],
         ),
       ),
@@ -153,100 +138,150 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   }
 
   Widget _buildTaskCard(TaskItemModel task) {
-    Color priorityColor;
-    switch (task.priority.toLowerCase()) {
-      case 'urgent':
-        priorityColor = Colors.red.shade600;
-        break;
-      case 'high':
-        priorityColor = Colors.orange.shade800;
-        break;
-      default:
-        priorityColor = Colors.blue.shade700;
+    Color priorityColor = OrbitColors.kpiGreen;
+    Color priorityBg = OrbitColors.kpiGreenBg;
+    if (task.priority.toLowerCase() == 'urgent') {
+      priorityColor = OrbitColors.kpiRed;
+      priorityBg = OrbitColors.kpiRedBg;
+    } else if (task.priority.toLowerCase() == 'high') {
+      priorityColor = OrbitColors.kpiOrange;
+      priorityBg = OrbitColors.kpiOrangeBg;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: OrbitColors.cardBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: priorityColor.withOpacity(0.12),
+                  color: priorityBg,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   task.priority.toUpperCase(),
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     color: priorityColor,
                   ),
                 ),
               ),
-              const Spacer(),
-              if (task.dueDate.isNotEmpty) ...[
-                const Icon(Icons.schedule, size: 14, color: WhatsAppColors.timeText),
-                const SizedBox(width: 4),
-                Text(
-                  task.dueDate,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: WhatsAppColors.timeText,
+              Row(
+                children: [
+                  const Icon(Icons.calendar_today_rounded, size: 12, color: OrbitColors.textMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    task.dueDate,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: OrbitColors.textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           Text(
             task.title,
             style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: WhatsAppColors.titleText,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: OrbitColors.textNavy,
             ),
           ),
           if (task.description.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               task.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 13,
-                color: WhatsAppColors.subtitleText,
+                fontSize: 12,
+                color: OrbitColors.textSecondary,
+                height: 1.3,
               ),
             ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
+
+          // Progress Indicator
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: task.progressPercent / 100.0,
-                    backgroundColor: WhatsAppColors.chipBorder,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      task.progressPercent == 100
-                          ? WhatsAppColors.badgeGreen
-                          : WhatsAppColors.tealGreen,
-                    ),
-                    minHeight: 6,
-                  ),
-                ),
+              const Text(
+                'Progress',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: OrbitColors.textSecondary),
               ),
-              const SizedBox(width: 12),
               Text(
                 '${task.progressPercent}%',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: WhatsAppColors.titleText,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: OrbitColors.textNavy),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: task.progressPercent / 100.0,
+              minHeight: 6,
+              backgroundColor: OrbitColors.scaffoldBackground,
+              valueColor: const AlwaysStoppedAnimation<Color>(OrbitColors.brandOrange),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Actions
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton(
+                onPressed: () {
+                  ref.read(taskRepositoryProvider).requestReview(task.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Review requested.'), duration: Duration(seconds: 1)),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: OrbitColors.primaryNavy,
+                  side: const BorderSide(color: OrbitColors.cardBorder),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                ),
+                child: const Text('Request Review', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: () {
+                  ref.read(taskNotifierProvider.notifier).completeTask(task.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Task completed.'), duration: Duration(seconds: 1)),
+                  );
+                },
+                icon: const Icon(Icons.check, size: 14),
+                label: const Text('Complete', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: OrbitColors.primaryNavy,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 ),
               ),
             ],
