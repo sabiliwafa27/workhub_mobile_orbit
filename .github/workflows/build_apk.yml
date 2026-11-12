@@ -57,11 +57,8 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build Release APK
-        run: flutter build apk --release --split-per-abi
-
-      - name: Build Universal APK
-        run: flutter build apk --release
+      - name: Build arm64 Release APK
+        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
 
       - name: Create Git Release & Upload APK
         if: github.ref == 'refs/heads/main'
@@ -70,12 +67,9 @@ jobs:
           tag_name: v1.0.${{ github.run_number }}
           name: WorkHub Mobile v1.0.${{ github.run_number }}
           body: |
-            Automated build for WorkHub Mobile APK.
+            Automated build for WorkHub Mobile APK (ARM64).
             Commit: ${{ github.sha }}
           files: |
-            build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            build/app/outputs/flutter-apk/app-x86_64-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
