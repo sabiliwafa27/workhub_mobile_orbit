@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/whatsapp_colors.dart';
+import '../../../core/theme/whatsapp_colors.dart';
 import '../providers/project_provider.dart';
 
 class ProjectsScreen extends ConsumerStatefulWidget {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/orbit_theme.dart';
+import '../../../core/theme/orbit_theme.dart';
 import '../providers/task_provider.dart';
 
 class TaskScreen extends ConsumerStatefulWidget {

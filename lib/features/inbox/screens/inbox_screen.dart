@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/orbit_theme.dart';
+import '../../../core/theme/orbit_theme.dart';
 import '../models/inbox_item_model.dart';
 import '../providers/inbox_provider.dart';
 

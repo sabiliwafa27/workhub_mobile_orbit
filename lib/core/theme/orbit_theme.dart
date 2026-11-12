@@ -36,6 +36,7 @@ class OrbitColors {
 
   // Accent & Decorative
   static const Color sunAmber = Color(0xFFFBBF24);
+  static const Color accentCoral = Color(0xFFEF4444);
   static const Color coralIcon = Color(0xFFEF4444);
   static const Color coralIconBg = Color(0xFFFEE2E2);
 
@@ -53,7 +54,6 @@ class OrbitTheme {
         seedColor: OrbitColors.primaryNavy,
         primary: OrbitColors.primaryNavy,
         surface: OrbitColors.cardSurface,
-        background: OrbitColors.scaffoldBackground,
       ),
       fontFamily: 'Roboto',
       appBarTheme: const AppBarTheme(
@@ -61,7 +61,7 @@ class OrbitTheme {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         color: OrbitColors.cardSurface,
         shape: RoundedRectangleBorder(
@@ -69,7 +69,7 @@ class OrbitTheme {
           side: const BorderSide(color: OrbitColors.cardBorder, width: 1),
         ),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: OrbitColors.cardSurface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),

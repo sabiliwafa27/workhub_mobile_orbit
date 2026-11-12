@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/realtime/reverb_service.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/realtime/reverb_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/inbox_item_model.dart';
 
