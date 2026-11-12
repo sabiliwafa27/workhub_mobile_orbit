@@ -11,40 +11,10 @@ class TaskScreen extends ConsumerStatefulWidget {
 }
 
 class _TaskScreenState extends ConsumerState<TaskScreen> {
-  final List<TaskItemModel> _fallbackTasks = [
-    TaskItemModel(
-      id: 912,
-      title: 'Evaluasi Penetrasi Pasar Area Sidoarjo Timur',
-      description: 'Lakukan mapping ulang toko retail dan rekap repeat order produk 275ml.',
-      status: 'in_progress',
-      progressPercent: 75,
-      dueDate: '15 Nov 2026',
-      priority: 'high',
-    ),
-    TaskItemModel(
-      id: 913,
-      title: 'Audit Stok Gudang Waru Minggu ke-2',
-      description: 'Verifikasi kesesuaian fisik karton kecap vs core WMS.',
-      status: 'pending_review',
-      progressPercent: 100,
-      dueDate: '12 Nov 2026',
-      priority: 'urgent',
-    ),
-    TaskItemModel(
-      id: 914,
-      title: 'Penyusunan Jadwal Kunjungan Outlet Baru',
-      description: 'Input target rute salesman wilayah Krian & Porong.',
-      status: 'assigned',
-      progressPercent: 30,
-      dueDate: '18 Nov 2026',
-      priority: 'medium',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final taskState = ref.watch(taskNotifierProvider);
-    final displayTasks = taskState.tasks.isNotEmpty ? taskState.tasks : _fallbackTasks;
+    final displayTasks = taskState.tasks;
 
     return Scaffold(
       backgroundColor: OrbitColors.scaffoldBackground,
@@ -127,10 +97,47 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
             const SizedBox(height: 14),
 
             // Tasks List
-            ...displayTasks.map((task) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: _buildTaskCard(task),
-                )),
+            if (taskState.isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: CircularProgressIndicator(color: OrbitColors.primaryNavy),
+                ),
+              )
+            else if (displayTasks.isEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: OrbitColors.cardBorder),
+                ),
+                child: Column(
+                  children: const [
+                    Icon(Icons.task_alt_rounded, size: 48, color: OrbitColors.textMuted),
+                    SizedBox(height: 12),
+                    Text(
+                      'No tasks assigned',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: OrbitColors.textNavy,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'All your tasks will be listed here when assigned.',
+                      style: TextStyle(fontSize: 12, color: OrbitColors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...displayTasks.map((task) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: _buildTaskCard(task),
+                  )),
           ],
         ),
       ),

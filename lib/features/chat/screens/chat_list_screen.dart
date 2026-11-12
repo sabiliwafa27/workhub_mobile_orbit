@@ -17,49 +17,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
   final List<String> _filters = ['All', 'Favorites', 'WORKING', 'Follow up'];
 
-  final List<ChatItemModel> _fallbackChats = [
-    ChatItemModel(
-      id: '1',
-      title: 'Toko Berkah Jaya',
-      lastMessage: 'Kirim kecap botol 275ml 10 karton ya mas...',
-      time: '11:32',
-      isPinned: true,
-      tag: 'WORKING',
-      isGroup: false,
-      senderPrefix: 'Pak Hendra',
-    ),
-    ChatItemModel(
-      id: '2',
-      title: 'Gudang Waru Logistic',
-      lastMessage: 'Penerimaan kedelai selesai dibongkar di bay 3.',
-      time: 'Yesterday',
-      isPinned: true,
-      tag: null,
-      isGroup: true,
-      senderPrefix: 'Mas Vito',
-    ),
-    ChatItemModel(
-      id: '3',
-      title: 'Toko Sri Rejeki Sidoarjo',
-      lastMessage: 'Sudah ditransfer untuk faktur kemarin.',
-      time: '12:19',
-      tag: 'Follow up',
-      isGroup: false,
-      senderPrefix: 'Bu Sri',
-    ),
-    ChatItemModel(
-      id: '4',
-      title: 'Mas Rudy PFI',
-      lastMessage: 'Jadwalkan review penetrasi pasar Sidoarjo timur.',
-      time: '09:25',
-      isGroup: false,
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatNotifierProvider);
-    final displayChats = chatState.chats.isNotEmpty ? chatState.chats : _fallbackChats;
+    final displayChats = chatState.chats;
 
     return Scaffold(
       backgroundColor: OrbitColors.scaffoldBackground,
@@ -181,15 +142,42 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
             // Chats List
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 90),
-                itemCount: displayChats.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final chat = displayChats[index];
-                  return _buildChatItem(chat);
-                },
-              ),
+              child: chatState.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: OrbitColors.primaryNavy),
+                    )
+                  : displayChats.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.chat_bubble_outline_rounded, size: 48, color: OrbitColors.textMuted),
+                              SizedBox(height: 12),
+                              Text(
+                                'No conversations found',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: OrbitColors.textNavy,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Customer and internal discussions will appear here.',
+                                style: TextStyle(fontSize: 12, color: OrbitColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 90),
+                          itemCount: displayChats.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final chat = displayChats[index];
+                            return _buildChatItem(chat);
+                          },
+                        ),
             ),
           ],
         ),

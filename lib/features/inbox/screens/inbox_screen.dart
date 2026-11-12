@@ -23,57 +23,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     'Tasks',
   ];
 
-  final List<InboxItemModel> _fallbackItems = [
-    InboxItemModel(
-      id: 101,
-      title: 'Tamu Dinas: Bapak Wahyu (Dinas Pertanian)',
-      source: 'guest_book',
-      sourceLabel: 'Guest Book',
-      status: 'pending_approval',
-      createdAt: '10:45 AM',
-      subtitle: 'Menunggu verifikasi security di pos gerbang utama.',
-      moduleCode: 'guest_book',
-      subjectKey: '101',
-    ),
-    InboxItemModel(
-      id: 102,
-      title: 'Penerimaan Logistic: PO-2026-0814 (Kedelai 10 Ton)',
-      source: 'logistic_in',
-      sourceLabel: 'Logistic In',
-      status: 'assigned',
-      createdAt: '09:15 AM',
-      subtitle: 'Truk N 8920 UY tiba di loading bay 3.',
-      moduleCode: 'logistic_in',
-      subjectKey: '102',
-    ),
-    InboxItemModel(
-      id: 103,
-      title: 'Persetujuan BBM Armada: Truk AG 8068 AO',
-      source: 'fleet',
-      sourceLabel: 'Fleet Approval',
-      status: 'pending',
-      createdAt: 'Yesterday',
-      subtitle: 'Klaim struk Pertamina Rp 650.000.',
-      moduleCode: 'fleet',
-      subjectKey: '103',
-    ),
-    InboxItemModel(
-      id: 104,
-      title: 'Revisi Sales Order: Toko Berkah Jaya (SO-08419)',
-      source: 'sales_order',
-      sourceLabel: 'Sales Order',
-      status: 'pending_revision',
-      createdAt: 'Yesterday',
-      subtitle: 'Koreksi kuantiti kecap botol 135ml.',
-      moduleCode: 'sales_order',
-      subjectKey: '104',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final inboxState = ref.watch(inboxNotifierProvider);
-    final rawItems = inboxState.items.isNotEmpty ? inboxState.items : _fallbackItems;
+    final rawItems = inboxState.items;
 
     final filteredItems = _selectedSource == 'All'
         ? rawItems

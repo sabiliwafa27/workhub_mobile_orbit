@@ -11,40 +11,10 @@ class ProjectsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
-  final List<ProjectItemModel> _fallbackProjects = [
-    ProjectItemModel(
-      id: 1,
-      name: 'Ekspansi Distribusi Area Jawa Timur 2026',
-      description: 'Program peningkatan penetrasi produk kecap botol dan jerigen di retail tradisional.',
-      progress: 68,
-      activeTasks: 8,
-      completedTasks: 16,
-      status: 'active',
-    ),
-    ProjectItemModel(
-      id: 2,
-      name: 'Modernisasi Modul Armada & FMS',
-      description: 'Integrasi OCR struk BBM dan rekonsiliasi MyPertamina otomatis.',
-      progress: 92,
-      activeTasks: 2,
-      completedTasks: 24,
-      status: 'active',
-    ),
-    ProjectItemModel(
-      id: 3,
-      name: 'Implementasi WMS Logistic In Rev',
-      description: 'Sistem intake barcode dan routing penerimaan barang mentah.',
-      progress: 80,
-      activeTasks: 5,
-      completedTasks: 20,
-      status: 'active',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final projectState = ref.watch(projectNotifierProvider);
-    final displayProjects = projectState.projects.isNotEmpty ? projectState.projects : _fallbackProjects;
+    final displayProjects = projectState.projects;
 
     return Scaffold(
       backgroundColor: WhatsAppColors.background,
@@ -115,21 +85,51 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
 
             const SizedBox(height: 8),
 
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: displayProjects.length,
-              separatorBuilder: (_, __) => const Divider(
-                color: WhatsAppColors.divider,
-                height: 1,
-                indent: 16,
-                endIndent: 16,
+            if (projectState.isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: CircularProgressIndicator(color: WhatsAppColors.tealGreen),
+                ),
+              )
+            else if (displayProjects.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                  child: Column(
+                    children: [
+                      Icon(Icons.hub_outlined, size: 48, color: WhatsAppColors.subtitleText),
+                      SizedBox(height: 12),
+                      Text(
+                        'No company initiatives found',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: WhatsAppColors.titleText),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Strategic projects and milestones will appear here.',
+                        style: TextStyle(fontSize: 12, color: WhatsAppColors.subtitleText),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: displayProjects.length,
+                separatorBuilder: (_, __) => const Divider(
+                  color: WhatsAppColors.divider,
+                  height: 1,
+                  indent: 16,
+                  endIndent: 16,
+                ),
+                itemBuilder: (context, index) {
+                  final project = displayProjects[index];
+                  return _buildProjectCard(project);
+                },
               ),
-              itemBuilder: (context, index) {
-                final project = displayProjects[index];
-                return _buildProjectCard(project);
-              },
-            ),
           ],
         ),
       ),

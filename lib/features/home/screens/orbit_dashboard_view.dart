@@ -1,8 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../inbox/models/inbox_item_model.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../tasks/providers/task_provider.dart';
 import '../../visits/models/visit_target_model.dart';
@@ -27,18 +29,12 @@ class OrbitDashboardView extends ConsumerStatefulWidget {
 class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   int _selectedVisitFilter = 0; // 0: All, 1: Open, 2: Check in, 3: Closed
   bool _isClockedIn = false;
-
-  final List<Map<String, dynamic>> _fallbackStores = [
-    {'name': 'Dwi - Ps Wates', 'status': 'Pending', 'address': 'Ps. Wates No. 12'},
-    {'name': 'Hariyanti - Ps Wates', 'status': 'Pending', 'address': 'Ps. Wates Blok B-4'},
-    {'name': 'Chris - Ps Wates', 'status': 'Pending', 'address': 'Jl. Raya Wates No. 8'},
-    {'name': 'Suharni - Ps Wates', 'status': 'Completed', 'address': 'Ps. Wates Timur'},
-  ];
+  DateTime? _clockInTime;
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
-    final userName = user?.name.split(' ').first ?? 'Budi';
+    final userName = user?.name.split(' ').first ?? 'User';
     final taskState = ref.watch(taskNotifierProvider);
     final inboxState = ref.watch(inboxNotifierProvider);
     final visitTargetsAsync = ref.watch(visitTargetsNotifierProvider);
@@ -65,7 +61,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 _buildTopBrandHeader(),
                 const SizedBox(height: 16),
 
-                // 2. Greeting & Decorative Sun Horizon
+                // 2. Greeting & Sun Horizon
                 _buildGreetingSection(userName),
                 const SizedBox(height: 16),
 
@@ -77,32 +73,29 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 _buildAttendanceCard(),
                 const SizedBox(height: 16),
 
-                // 5. Date Strip Capsule
+                // 5. Dynamic Date Strip Capsule
                 _buildDateStrip(),
                 const SizedBox(height: 16),
 
-                // 6. Score & Performance Cards (Side by Side)
+                // 6. Live Overview & Progress Row
                 _buildScoreAndPerformanceRow(taskState, inboxState),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-                // 7. Today's Visits & Metric Filter Capsules
-                _buildTodayVisitsSection(visitTargets),
-                const SizedBox(height: 16),
+                // 7. Live Assigned Tasks Section
+                _buildActiveTasksSection(taskState),
+                const SizedBox(height: 20),
 
-                // 8. Supervisor Guidance / AI Priority Assistant Card
-                _buildSupervisorGuidanceCard(),
-                const SizedBox(height: 16),
+                // 8. Live Unified Inbox & Approvals Section
+                _buildPendingInboxSection(inboxState),
+                const SizedBox(height: 20),
 
-                // 9. Working Hours Card
-                _buildWorkingHoursCard(),
-                const SizedBox(height: 16),
-
-                // 10. KPI Performance Radar / Metric Cards
-                _buildKpiMetricsGrid(),
-                const SizedBox(height: 16),
-
-                // 11. Top Priority Stores / Customers
-                _buildTopStoresList(visitTargets),
+                // 9. Today's Scheduled Visits (only if visit targets exist)
+                if (visitTargets.isNotEmpty) ...[
+                  _buildTodayVisitsSection(visitTargets),
+                  const SizedBox(height: 16),
+                  _buildTopStoresList(visitTargets),
+                  const SizedBox(height: 16),
+                ],
               ],
             ),
           ),
@@ -144,7 +137,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     ),
                   ),
                   TextSpan(
-                    text: 'Sales',
+                    text: 'WorkHub',
                     style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w600,
@@ -204,6 +197,15 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   }
 
   Widget _buildGreetingSection(String name) {
+    final hour = DateTime.now().hour;
+    final timeGreeting = hour < 11
+        ? 'Good Morning'
+        : hour < 15
+            ? 'Good Afternoon'
+            : hour < 18
+                ? 'Good Evening'
+                : 'Good Night';
+
     return Stack(
       children: [
         Positioned(
@@ -260,7 +262,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Good Morning, $name',
+              '$timeGreeting, $name',
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -270,7 +272,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             ),
             const SizedBox(height: 2),
             const Text(
-              'Sales Productivity Dashboard',
+              'Operational & Productivity Dashboard',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
@@ -309,7 +311,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 Expanded(
                   child: TextField(
                     decoration: const InputDecoration(
-                      hintText: 'Search customer / store',
+                      hintText: 'Search tasks, inbox & records',
                       hintStyle: TextStyle(
                         fontSize: 13,
                         color: OrbitColors.textMuted,
@@ -352,6 +354,10 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   }
 
   Widget _buildAttendanceCard() {
+    final statusText = _isClockedIn && _clockInTime != null
+        ? 'Clocked in ${DateFormat('HH:mm').format(_clockInTime!)}'
+        : 'Tap navigation arrow to clock in';
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -396,7 +402,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _isClockedIn ? 'Clocked in 07:15' : 'Not clocked in',
+                  statusText,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -408,7 +414,12 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           ),
           InkWell(
             onTap: () {
-              setState(() => _isClockedIn = !_isClockedIn);
+              setState(() {
+                _isClockedIn = !_isClockedIn;
+                if (_isClockedIn) {
+                  _clockInTime = DateTime.now();
+                }
+              });
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(_isClockedIn ? 'Clocked in successfully!' : 'Clocked out.'),
@@ -423,9 +434,9 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 color: OrbitColors.scaffoldBackground,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.navigation_rounded,
-                color: OrbitColors.textNavy,
+              child: Icon(
+                _isClockedIn ? Icons.check_circle_rounded : Icons.navigation_rounded,
+                color: _isClockedIn ? OrbitColors.kpiGreen : OrbitColors.textNavy,
                 size: 20,
               ),
             ),
@@ -436,6 +447,8 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   }
 
   Widget _buildDateStrip() {
+    final nowFormatted = DateFormat('EEEE, d MMMM yyyy').format(DateTime.now());
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -460,9 +473,9 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           const SizedBox(width: 8),
           const Icon(Icons.tune_rounded, size: 16, color: OrbitColors.textMuted),
           const Spacer(),
-          const Text(
-            'Kamis, 2 Jumadil Akhir 1448',
-            style: TextStyle(
+          Text(
+            nowFormatted,
+            style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: OrbitColors.textSecondary,
@@ -476,14 +489,16 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   Widget _buildScoreAndPerformanceRow(TaskListState taskState, InboxListState inboxState) {
     final activeCount = taskState.tasks.length;
     final totalInbox = inboxState.items.length;
-    final score = totalInbox > 0 ? min(100.0, (activeCount / totalInbox) * 100).toStringAsFixed(1) : '79.4';
+    final completedCount = taskState.tasks.where((t) => t.status == 'completed' || t.status == 'done').length;
+    final progressPercent = activeCount > 0 ? ((completedCount / activeCount) * 100).toInt() : 0;
+    final progressRatio = activeCount > 0 ? (completedCount / activeCount) : 0.0;
 
     return Row(
       children: [
-        // Left Card: Daily Score (Navy Gradient)
+        // Left Card: Assigned Tasks (Navy Gradient)
         Expanded(
           child: Container(
-            height: 140,
+            height: 130,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
@@ -510,10 +525,10 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                   children: [
                     Row(
                       children: const [
-                        Icon(Icons.shield_outlined, size: 15, color: Colors.white70),
+                        Icon(Icons.assignment_turned_in_outlined, size: 15, color: Colors.white70),
                         SizedBox(width: 4),
                         Text(
-                          'Daily Score',
+                          'Assigned Tasks',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -524,18 +539,18 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     ),
                     const Spacer(),
                     Text(
-                      '$activeCount Tasks',
+                      '$activeCount',
                       style: const TextStyle(
-                        fontSize: 22,
+                        fontSize: 26,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
                         letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'Rank #1 of 6',
-                      style: TextStyle(
+                    Text(
+                      activeCount == 0 ? 'No pending tasks' : '$activeCount tasks in queue',
+                      style: const TextStyle(
                         fontSize: 11,
                         color: Colors.white70,
                         fontWeight: FontWeight.w500,
@@ -565,10 +580,10 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
         ),
         const SizedBox(width: 12),
 
-        // Right Card: MTD Performance (Cream Tint)
+        // Right Card: Pending Inbox & Approvals (Cream Tint)
         Expanded(
           child: Container(
-            height: 140,
+            height: 130,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: OrbitColors.creamCard,
@@ -582,7 +597,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'MTD Performance',
+                    'Inbox Todos',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -594,28 +609,28 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 Stack(
                   alignment: Alignment.center,
                   children: [
-                    const SizedBox(
-                      width: 64,
-                      height: 64,
+                    SizedBox(
+                      width: 58,
+                      height: 58,
                       child: CircularProgressIndicator(
-                        value: 0.794,
-                        strokeWidth: 6,
+                        value: progressRatio > 0 ? progressRatio : 0.0,
+                        strokeWidth: 5.5,
                         backgroundColor: OrbitColors.creamBorder,
-                        valueColor: AlwaysStoppedAnimation<Color>(OrbitColors.brandOrange),
+                        valueColor: const AlwaysStoppedAnimation<Color>(OrbitColors.brandOrange),
                       ),
                     ),
                     Column(
                       children: [
                         Text(
-                          '$score%',
+                          '$totalInbox',
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: OrbitColors.textNavy,
                           ),
                         ),
                         const Text(
-                          'Realized',
+                          'Pending',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w500,
@@ -631,6 +646,383 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildActiveTasksSection(TaskListState taskState) {
+    final tasks = taskState.tasks;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.task_alt_rounded, size: 17, color: OrbitColors.textNavy),
+                const SizedBox(width: 6),
+                const Text(
+                  'Active Assigned Tasks',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: OrbitColors.textNavy,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: OrbitColors.primaryNavy.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${tasks.length}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: OrbitColors.primaryNavy,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (taskState.isLoading)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: OrbitColors.primaryNavy),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (tasks.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: OrbitColors.cardBorder),
+            ),
+            child: Column(
+              children: const [
+                Icon(Icons.assignment_outlined, size: 36, color: OrbitColors.textMuted),
+                SizedBox(height: 8),
+                Text(
+                  'No assigned tasks right now',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: OrbitColors.textNavy,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Tasks assigned to you will automatically appear here.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: OrbitColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: min(5, tasks.length),
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final task = tasks[index];
+              Color priorityColor = OrbitColors.kpiGreen;
+              Color priorityBg = OrbitColors.kpiGreenBg;
+              if (task.priority.toLowerCase() == 'urgent') {
+                priorityColor = OrbitColors.kpiRed;
+                priorityBg = OrbitColors.kpiRedBg;
+              } else if (task.priority.toLowerCase() == 'high') {
+                priorityColor = OrbitColors.kpiOrange;
+                priorityBg = OrbitColors.kpiOrangeBg;
+              }
+
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: OrbitColors.cardBorder),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x04000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: priorityBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            task.priority.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: priorityColor,
+                            ),
+                          ),
+                        ),
+                        if (task.dueDate.isNotEmpty)
+                          Row(
+                            children: [
+                              const Icon(Icons.calendar_today_rounded, size: 11, color: OrbitColors.textMuted),
+                              const SizedBox(width: 4),
+                              Text(
+                                task.dueDate,
+                                style: const TextStyle(fontSize: 11, color: OrbitColors.textMuted),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      task.title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: OrbitColors.textNavy,
+                      ),
+                    ),
+                    if (task.description.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        task.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: OrbitColors.textSecondary,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              value: (task.progressPercent / 100.0).clamp(0.0, 1.0),
+                              minHeight: 5,
+                              backgroundColor: OrbitColors.scaffoldBackground,
+                              valueColor: const AlwaysStoppedAnimation<Color>(OrbitColors.brandOrange),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${task.progressPercent}%',
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: OrbitColors.textNavy),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPendingInboxSection(InboxListState inboxState) {
+    final items = inboxState.items;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.mark_email_unread_outlined, size: 17, color: OrbitColors.textNavy),
+                const SizedBox(width: 6),
+                const Text(
+                  'Unified Inbox & Approvals',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: OrbitColors.textNavy,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: OrbitColors.brandOrange.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${items.length}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: OrbitColors.brandOrange,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (inboxState.isLoading)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: OrbitColors.brandOrange),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (items.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: OrbitColors.cardBorder),
+            ),
+            child: Column(
+              children: const [
+                Icon(Icons.inbox_outlined, size: 36, color: OrbitColors.textMuted),
+                SizedBox(height: 8),
+                Text(
+                  'All caught up!',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: OrbitColors.textNavy,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'No pending approvals or unread notifications.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: OrbitColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: min(5, items.length),
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              Color tagBg = OrbitColors.bubbleBlue;
+              Color tagColor = OrbitColors.primaryNavy;
+
+              if (item.source.contains('guest')) {
+                tagBg = const Color(0xFFFEF3C7);
+                tagColor = const Color(0xFFB45309);
+              } else if (item.source.contains('logistic')) {
+                tagBg = const Color(0xFFDCFCE7);
+                tagColor = const Color(0xFF15803D);
+              } else if (item.source.contains('fleet')) {
+                tagBg = OrbitColors.coralIconBg;
+                tagColor = OrbitColors.coralIcon;
+              }
+
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: OrbitColors.cardBorder),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x04000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: tagBg,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        item.sourceLabel,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: tagColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: OrbitColors.textNavy,
+                            ),
+                          ),
+                          if (item.subtitle != null && item.subtitle!.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              item.subtitle!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: OrbitColors.textSecondary,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      item.createdAt,
+                      style: const TextStyle(fontSize: 10, color: OrbitColors.textMuted),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -743,265 +1135,12 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     );
   }
 
-  Widget _buildSupervisorGuidanceCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: OrbitColors.cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 18,
-                backgroundColor: OrbitColors.scaffoldBackground,
-                child: Icon(Icons.person, color: OrbitColors.primaryNavy, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Raka',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: OrbitColors.textNavy,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: OrbitColors.coralIconBg,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'Prioritas',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: OrbitColors.coralIcon,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Text(
-                      'Leading Supervisor',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: OrbitColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.refresh_rounded, size: 18, color: OrbitColors.textMuted),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: OrbitColors.bubbleBlue,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: OrbitColors.bubbleBlueBorder),
-            ),
-            child: const Text(
-              'Anda masih tertinggal Rp 36,7jt dari target harian dengan DPI terlemah di Sales Value. Segera kunjungi PFI - Ps Wates, Hariyanti - Ps Wates, Chris - statusnya pending untuk menyelesaikan kunjungan lainnya bisa dijaga pada jadwal berikutnya.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.4,
-                color: Color(0xFF0369A1),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '🕒 Generated at 09:18',
-              style: TextStyle(
-                fontSize: 10,
-                color: OrbitColors.textMuted,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWorkingHoursCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: OrbitColors.cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.calendar_month_outlined, size: 16, color: OrbitColors.textNavy),
-              SizedBox(width: 6),
-              Text(
-                'Working Hours',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: OrbitColors.textNavy,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                '07:12 - 09:20',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: OrbitColors.textNavy,
-                ),
-              ),
-              Text(
-                '2h 8m / 6h',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: OrbitColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: 0.35,
-              minHeight: 6,
-              backgroundColor: OrbitColors.scaffoldBackground,
-              valueColor: const AlwaysStoppedAnimation<Color>(OrbitColors.brandOrange),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKpiMetricsGrid() {
-    final kpis = [
-      {'title': 'SKU Lines', 'value': '60%', 'target': '60%', 'color': OrbitColors.kpiOrange, 'bg': OrbitColors.kpiOrangeBg},
-      {'title': 'Effective Calls', 'value': '0%', 'target': '0%', 'color': OrbitColors.kpiRed, 'bg': OrbitColors.kpiRedBg},
-      {'title': 'Stores / Hour', 'value': '70%', 'target': '70%', 'color': OrbitColors.kpiOrange, 'bg': OrbitColors.kpiOrangeBg},
-      {'title': 'Productive Hours', 'value': '83%', 'target': '83%', 'color': OrbitColors.kpiGreen, 'bg': OrbitColors.kpiGreenBg},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'KPI Performance',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: OrbitColors.textNavy,
-          ),
-        ),
-        const SizedBox(height: 10),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 2.1,
-          ),
-          itemCount: kpis.length,
-          itemBuilder: (context, i) {
-            final kpi = kpis[i];
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: OrbitColors.cardBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        kpi['title'] as String,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: OrbitColors.textSecondary,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: kpi['bg'] as Color,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          kpi['target'] as String,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: kpi['color'] as Color,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    kpi['value'] as String,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: kpi['color'] as Color,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
   Widget _buildTopStoresList(List<VisitTargetModel> targets) {
-    final hasRealTargets = targets.isNotEmpty;
-    final count = hasRealTargets ? targets.length : _fallbackStores.length;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Toko Utama Anda ($count dari ${max(15, count)})',
+          'Target Kunjungan Hari Ini (${targets.length})',
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -1012,12 +1151,13 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: count,
+          itemCount: targets.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, i) {
-            final name = hasRealTargets ? targets[i].customerName : _fallbackStores[i]['name'] as String;
-            final address = hasRealTargets ? targets[i].address : _fallbackStores[i]['address'] as String;
-            final isDone = hasRealTargets ? targets[i].isCheckedIn : _fallbackStores[i]['status'] == 'Completed';
+            final target = targets[i];
+            final name = target.customerName;
+            final address = target.address;
+            final isDone = target.isCheckedIn;
 
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1029,7 +1169,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
               child: Row(
                 children: [
                   Icon(
-                    isDone ? Icons.check_circle_rounded : Icons.emoji_events_rounded,
+                    isDone ? Icons.check_circle_rounded : Icons.storefront_rounded,
                     color: isDone ? OrbitColors.kpiGreen : OrbitColors.brandOrange,
                     size: 20,
                   ),
@@ -1046,14 +1186,16 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                             color: OrbitColors.textNavy,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          address,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: OrbitColors.textSecondary,
+                        if (address.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            address,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: OrbitColors.textSecondary,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
