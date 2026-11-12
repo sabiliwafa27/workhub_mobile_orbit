@@ -47,6 +47,12 @@ jobs:
           if [ -f android/settings.gradle ]; then
             sed -i '/pluginManagement {/a \    repositories {\n        google()\n        mavenCentral()\n        gradlePluginPortal()\n    }' android/settings.gradle
           fi
+          # Disable lintVitalAnalyzeRelease to prevent ExifDataCopier NoSuchMethodError in AGP lint
+          if [ -f android/app/build.gradle.kts ]; then
+            echo -e "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}" >> android/app/build.gradle.kts
+          elif [ -f android/app/build.gradle ]; then
+            echo -e "\nandroid {\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }\n}" >> android/app/build.gradle
+          fi
 
       - name: Get Dependencies
         run: flutter pub get
