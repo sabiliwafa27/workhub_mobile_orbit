@@ -6,6 +6,9 @@ class UserModel {
   final String? employeeUuid;
   final String? employeeCode;
   final String? profilePhotoUrl;
+  final String? username;
+  final String? title;
+  final String? department;
   final List<String> permissions;
   final Map<String, dynamic> modules;
 
@@ -17,6 +20,9 @@ class UserModel {
     this.employeeUuid,
     this.employeeCode,
     this.profilePhotoUrl,
+    this.username,
+    this.title,
+    this.department,
     required this.permissions,
     required this.modules,
   });
@@ -42,14 +48,20 @@ class UserModel {
       }
     }
 
+    final emailStr = json['email'] as String? ?? '';
+    final defaultUsername = emailStr.contains('@') ? emailStr.split('@').first : null;
+
     return UserModel(
       id: json['id'] as int? ?? 0,
       name: json['name'] as String? ?? '',
-      email: json['email'] as String? ?? '',
+      email: emailStr,
       employeeId: json['employee_id'] as int?,
       employeeUuid: json['employee_uuid'] as String?,
       employeeCode: json['employee_code'] as String?,
       profilePhotoUrl: json['profile_photo_url'] as String?,
+      username: json['username'] as String? ?? defaultUsername,
+      title: json['title'] as String? ?? json['job_title'] as String? ?? json['position'] as String?,
+      department: json['department'] as String? ?? json['division'] as String?,
       permissions: perms,
       modules: mods,
     );

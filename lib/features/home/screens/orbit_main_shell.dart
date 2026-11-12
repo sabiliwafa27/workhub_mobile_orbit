@@ -184,6 +184,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
             _buildProfileRow('Email', user?.email ?? '-'),
             _buildProfileRow('Job Title', user?.title ?? '-'),
             _buildProfileRow('Department', user?.department ?? '-'),
+            _buildProfileRow('Employee Code', user?.employeeCode ?? '-'),
             _buildProfileRow('Employee ID', user?.employeeId?.toString() ?? '-'),
           ],
         ),
