@@ -1,7 +1,19 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/network/api_client.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/visit_target_model.dart';
+
+final visitServiceProvider = Provider<VisitService>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return VisitService(apiClient);
+});
+
+final visitTargetsNotifierProvider = FutureProvider<List<VisitTargetModel>>((ref) async {
+  final service = ref.watch(visitServiceProvider);
+  return await service.getVisitTargets();
+});
 
 class VisitService {
   final ApiClient _apiClient;

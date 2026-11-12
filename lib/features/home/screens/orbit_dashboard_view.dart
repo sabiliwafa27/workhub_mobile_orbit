@@ -5,6 +5,8 @@ import '../../../core/theme/orbit_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../tasks/providers/task_provider.dart';
+import '../../visits/models/visit_target_model.dart';
+import '../../visits/services/visit_service.dart';
 
 class OrbitDashboardView extends ConsumerStatefulWidget {
   final VoidCallback onOpenSearch;
@@ -26,7 +28,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   int _selectedVisitFilter = 0; // 0: All, 1: Open, 2: Check in, 3: Closed
   bool _isClockedIn = false;
 
-  final List<Map<String, dynamic>> _topStores = [
+  final List<Map<String, dynamic>> _fallbackStores = [
     {'name': 'Dwi - Ps Wates', 'status': 'Pending', 'address': 'Ps. Wates No. 12'},
     {'name': 'Hariyanti - Ps Wates', 'status': 'Pending', 'address': 'Ps. Wates Blok B-4'},
     {'name': 'Chris - Ps Wates', 'status': 'Pending', 'address': 'Jl. Raya Wates No. 8'},
@@ -39,6 +41,8 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     final userName = user?.name.split(' ').first ?? 'Budi';
     final taskState = ref.watch(taskNotifierProvider);
     final inboxState = ref.watch(inboxNotifierProvider);
+    final visitTargetsAsync = ref.watch(visitTargetsNotifierProvider);
+    final visitTargets = visitTargetsAsync.value ?? [];
 
     return Scaffold(
       backgroundColor: OrbitColors.scaffoldBackground,
@@ -49,6 +53,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           onRefresh: () async {
             await ref.read(taskNotifierProvider.notifier).loadTasks();
             await ref.read(inboxNotifierProvider.notifier).loadInbox();
+            ref.invalidate(visitTargetsNotifierProvider);
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -77,11 +82,11 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 const SizedBox(height: 16),
 
                 // 6. Score & Performance Cards (Side by Side)
-                _buildScoreAndPerformanceRow(taskState),
+                _buildScoreAndPerformanceRow(taskState, inboxState),
                 const SizedBox(height: 16),
 
                 // 7. Today's Visits & Metric Filter Capsules
-                _buildTodayVisitsSection(),
+                _buildTodayVisitsSection(visitTargets),
                 const SizedBox(height: 16),
 
                 // 8. Supervisor Guidance / AI Priority Assistant Card
@@ -97,7 +102,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 const SizedBox(height: 16),
 
                 // 11. Top Priority Stores / Customers
-                _buildTopStoresList(),
+                _buildTopStoresList(visitTargets),
               ],
             ),
           ),
@@ -115,7 +120,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: OrbitColors.primaryNavy,
                 shape: BoxShape.circle,
               ),
@@ -414,7 +419,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             borderRadius: BorderRadius.circular(999),
             child: Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: OrbitColors.scaffoldBackground,
                 shape: BoxShape.circle,
               ),
@@ -468,7 +473,11 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     );
   }
 
-  Widget _buildScoreAndPerformanceRow(TaskListState taskState) {
+  Widget _buildScoreAndPerformanceRow(TaskListState taskState, InboxListState inboxState) {
+    final activeCount = taskState.tasks.length;
+    final totalInbox = inboxState.items.length;
+    final score = totalInbox > 0 ? min(100.0, (activeCount / totalInbox) * 100).toStringAsFixed(1) : '79.4';
+
     return Row(
       children: [
         // Left Card: Daily Score (Navy Gradient)
@@ -514,10 +523,10 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                       ],
                     ),
                     const Spacer(),
-                    const Text(
-                      '0.0%',
-                      style: TextStyle(
-                        fontSize: 26,
+                    Text(
+                      '$activeCount Tasks',
+                      style: const TextStyle(
+                        fontSize: 22,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
                         letterSpacing: -0.5,
@@ -585,27 +594,27 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 Stack(
                   alignment: Alignment.center,
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 64,
                       height: 64,
                       child: CircularProgressIndicator(
                         value: 0.794,
                         strokeWidth: 6,
                         backgroundColor: OrbitColors.creamBorder,
-                        valueColor: const AlwaysStoppedAnimation<Color>(OrbitColors.brandOrange),
+                        valueColor: AlwaysStoppedAnimation<Color>(OrbitColors.brandOrange),
                       ),
                     ),
                     Column(
-                      children: const [
+                      children: [
                         Text(
-                          '79.4%',
-                          style: TextStyle(
+                          '$score%',
+                          style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                             color: OrbitColors.textNavy,
                           ),
                         ),
-                        Text(
+                        const Text(
                           'Realized',
                           style: TextStyle(
                             fontSize: 9,
@@ -626,13 +635,19 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     );
   }
 
-  Widget _buildTodayVisitsSection() {
+  Widget _buildTodayVisitsSection(List<VisitTargetModel> targets) {
+    final checkedInCount = targets.where((t) => t.isCheckedIn).length;
+    final totalCount = targets.length;
+    final openCount = totalCount - checkedInCount;
+
     final filters = [
-      {'label': 'All', 'count': '0'},
-      {'label': 'Open', 'count': '0'},
-      {'label': 'Check in', 'count': '0'},
+      {'label': 'All', 'count': totalCount.toString()},
+      {'label': 'Open', 'count': openCount.toString()},
+      {'label': 'Check in', 'count': checkedInCount.toString()},
       {'label': 'Closed', 'count': '0'},
     ];
+
+    final percentCompleted = totalCount > 0 ? ((checkedInCount / totalCount) * 100).toInt() : 0;
 
     return Column(
       children: [
@@ -659,9 +674,9 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 color: OrbitColors.kpiGreenBg,
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: const Text(
-                '0% Completed',
-                style: TextStyle(
+              child: Text(
+                '$percentCompleted% Completed',
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: OrbitColors.kpiGreen,
@@ -978,13 +993,16 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     );
   }
 
-  Widget _buildTopStoresList() {
+  Widget _buildTopStoresList(List<VisitTargetModel> targets) {
+    final hasRealTargets = targets.isNotEmpty;
+    final count = hasRealTargets ? targets.length : _fallbackStores.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Toko Utama Anda (4 dari 15)',
-          style: TextStyle(
+        Text(
+          'Toko Utama Anda ($count dari ${max(15, count)})',
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
             color: OrbitColors.textNavy,
@@ -994,10 +1012,13 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _topStores.length,
+          itemCount: count,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, i) {
-            final store = _topStores[i];
+            final name = hasRealTargets ? targets[i].customerName : _fallbackStores[i]['name'] as String;
+            final address = hasRealTargets ? targets[i].address : _fallbackStores[i]['address'] as String;
+            final isDone = hasRealTargets ? targets[i].isCheckedIn : _fallbackStores[i]['status'] == 'Completed';
+
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
@@ -1007,9 +1028,9 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.emoji_events_rounded,
-                    color: OrbitColors.brandOrange,
+                  Icon(
+                    isDone ? Icons.check_circle_rounded : Icons.emoji_events_rounded,
+                    color: isDone ? OrbitColors.kpiGreen : OrbitColors.brandOrange,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -1018,7 +1039,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          store['name'] as String,
+                          name,
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -1027,7 +1048,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          store['address'] as String,
+                          address,
                           style: const TextStyle(
                             fontSize: 11,
                             color: OrbitColors.textSecondary,

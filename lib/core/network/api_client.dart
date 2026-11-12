@@ -33,15 +33,16 @@ class ApiClient {
           if (!path.startsWith('/')) {
             path = '/$path';
           }
-          if (!path.startsWith('/api/') && !path.startsWith('/inbox/')) {
+          if (!path.startsWith('/api/') && !path.startsWith('/workhub/') && !path.startsWith('/inbox/')) {
             if (path.startsWith('/auth') ||
-                path.startsWith('/conversations') ||
-                path.startsWith('/visit') ||
-                path.startsWith('/check-ins') ||
-                path.startsWith('/sales-orders') ||
                 path.startsWith('/realtime') ||
                 path.startsWith('/fcm-device-tokens')) {
               path = '/api/v1$path';
+            } else if (path.startsWith('/conversations') ||
+                path.startsWith('/visit') ||
+                path.startsWith('/check-ins') ||
+                path.startsWith('/sales-orders')) {
+              path = '/workhub/api/v1$path';
             }
           }
           options.path = path;
