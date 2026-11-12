@@ -57,8 +57,26 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
+      - name: Cache Gradle dependencies
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Build arm64 Release APK
-        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
+        shell: bash
+        run: |
+          set -o pipefail
+          build_log="$(mktemp)"
+          trap 'rm -f "$build_log"' EXIT
+          for attempt in 1 2 3; do
+            if flutter build apk --release --target-platform android-arm64 --split-per-abi 2>&1 | tee "$build_log"; then
+              exit 0
+            fi
+            if ! grep -Eq '429|Too Many Requests' "$build_log" || [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            delay=$((attempt * 60))
+            echo "Dependency repository rate limited the build; retrying in ${delay}s."
+            sleep "$delay"
+          done
 
       - name: Create Git Release & Upload APK
         if: github.ref == 'refs/heads/main'
