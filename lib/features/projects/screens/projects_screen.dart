@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/whatsapp_colors.dart';
 import '../providers/project_provider.dart';
+import '../../tasks/screens/create_work_item_screen.dart';
 
 class ProjectsScreen extends ConsumerStatefulWidget {
   const ProjectsScreen({super.key});
@@ -92,6 +93,13 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                   child: CircularProgressIndicator(color: WhatsAppColors.tealGreen),
                 ),
               )
+            else if (projectState.error != null)
+              Center(
+                child: TextButton(
+                  onPressed: () => ref.read(projectNotifierProvider.notifier).loadProjects(),
+                  child: const Text('Unable to load projects. Tap to retry.'),
+                ),
+              )
             else if (displayProjects.isEmpty)
               const Center(
                 child: Padding(
@@ -127,7 +135,12 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                 ),
                 itemBuilder: (context, index) {
                   final project = displayProjects[index];
-                  return _buildProjectCard(project);
+                  return InkWell(
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => ProjectTasksScreen(project: project),
+                    )),
+                    child: _buildProjectCard(project),
+                  );
                 },
               ),
           ],
@@ -213,6 +226,45 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class ProjectTasksScreen extends ConsumerWidget {
+  final ProjectItemModel project;
+
+  const ProjectTasksScreen({super.key, required this.project});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tasks = ref.watch(projectTasksProvider(project.id));
+    return Scaffold(
+      appBar: AppBar(title: Text(project.name)),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final created = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateWorkItemScreen(projectId: project.id)));
+          if (created == true && context.mounted) ref.invalidate(projectTasksProvider(project.id));
+        },
+        child: const Icon(Icons.add),
+      ),
+      body: tasks.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => Center(
+          child: TextButton(
+            onPressed: () => ref.invalidate(projectTasksProvider(project.id)),
+            child: const Text('Unable to load project tasks. Tap to retry.'),
+          ),
+        ),
+        data: (items) => items.isEmpty
+            ? const Center(child: Text('No tasks in this project.'))
+            : ListView.builder(
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final task = items[index];
+                  return ListTile(title: Text(task.title), subtitle: Text(task.status));
+                },
+              ),
       ),
     );
   }

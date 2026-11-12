@@ -6,6 +6,7 @@ import '../../../core/updater/app_updater_service.dart';
 import '../../../core/updater/update_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chat/screens/chat_list_screen.dart';
+import '../../chat/screens/employee_chat_screen.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
 import '../../projects/screens/projects_screen.dart';
@@ -261,14 +262,10 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     final inboxCount = ref.watch(inboxNotifierProvider).items.length;
 
     final pages = [
-      OrbitDashboardView(
-        onOpenSearch: () => setState(() => _currentIndex = 3),
-        onOpenNotifications: () => setState(() => _currentIndex = 1),
-        onOpenCheckIn: _showQuickActionSheet,
-      ),
+      const EmployeeChatScreen(),
       const InboxScreen(),
       const TaskScreen(),
-      const ChatListScreen(),
+      const ProjectsScreen(),
     ];
 
     return Scaffold(
@@ -315,43 +312,18 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
             badgeCount: inboxCount > 0 ? inboxCount : null,
           ),
 
-          // 3. Center Deep Navy Action Button
-          GestureDetector(
-            onTap: _showQuickActionSheet,
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: const BoxDecoration(
-                color: OrbitColors.primaryNavy,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x3306244D),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.search,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-          ),
-
           // 4. Tasks
           _buildNavItem(
             index: 2,
-            icon: Icons.map_outlined,
-            label: 'Routes',
+            icon: Icons.task_alt,
+            label: 'Tasks',
           ),
 
           // 5. Discussions / Profile
           _buildNavItem(
             index: 3,
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Chats',
+            icon: Icons.folder_outlined,
+            label: 'Projects',
           ),
         ],
       ),

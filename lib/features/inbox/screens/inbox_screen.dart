@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../models/inbox_item_model.dart';
 import '../providers/inbox_provider.dart';
+import '../../tasks/screens/create_work_item_screen.dart';
 
 class InboxScreen extends ConsumerStatefulWidget {
   const InboxScreen({super.key});
@@ -33,6 +34,18 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         : rawItems.where((item) => item.sourceLabel.toLowerCase() == _selectedSource.toLowerCase()).toList();
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final isEc = await showModalBottomSheet<bool>(context: context, builder: (context) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            ListTile(title: const Text('Create task'), onTap: () => Navigator.pop(context, false)),
+            ListTile(title: const Text('Create EC'), onTap: () => Navigator.pop(context, true)),
+          ])));
+          if (isEc == null || !context.mounted) return;
+          final created = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateWorkItemScreen(isEc: isEc)));
+          if (created == true && context.mounted) ref.read(inboxNotifierProvider.notifier).loadInbox();
+        },
+        child: const Icon(Icons.add),
+      ),
       backgroundColor: OrbitColors.scaffoldBackground,
       appBar: AppBar(
         title: const Text(
@@ -98,7 +111,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
             // Items List
             Expanded(
-              child: filteredItems.isEmpty
+              child: inboxState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : inboxState.error != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('Unable to load inbox. Please try again.'),
+                          TextButton(
+                            onPressed: () => ref.read(inboxNotifierProvider.notifier).loadInbox(),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : filteredItems.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -206,10 +234,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               OutlinedButton.icon(
-                onPressed: () {
-                  ref.read(inboxNotifierProvider.notifier).completeItem(item);
+                onPressed: () async {
+                  final completed = await ref.read(inboxNotifierProvider.notifier).completeItem(item);
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Item marked as completed.'), duration: Duration(seconds: 1)),
+                    SnackBar(content: Text(completed ? 'Item marked as completed.' : 'Unable to complete this item.'), duration: const Duration(seconds: 2)),
                   );
                 },
                 icon: const Icon(Icons.check_circle_outline, size: 16),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../providers/task_provider.dart';
+import 'create_work_item_screen.dart';
 
 class TaskScreen extends ConsumerStatefulWidget {
   const TaskScreen({super.key});
@@ -17,6 +18,13 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     final displayTasks = taskState.tasks;
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final created = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const CreateWorkItemScreen()));
+          if (created == true && context.mounted) ref.read(taskNotifierProvider.notifier).loadTasks();
+        },
+        child: const Icon(Icons.add),
+      ),
       backgroundColor: OrbitColors.scaffoldBackground,
       appBar: AppBar(
         title: const Text(
@@ -102,6 +110,13 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 40),
                   child: CircularProgressIndicator(color: OrbitColors.primaryNavy),
+                ),
+              )
+            else if (taskState.error != null)
+              Center(
+                child: TextButton(
+                  onPressed: () => ref.read(taskNotifierProvider.notifier).loadTasks(),
+                  child: const Text('Unable to load tasks. Tap to retry.'),
                 ),
               )
             else if (displayTasks.isEmpty)

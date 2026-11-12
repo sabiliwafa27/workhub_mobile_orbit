@@ -26,7 +26,7 @@ class InboxRepository {
       }
       return [];
     } catch (_) {
-      return [];
+      rethrow;
     }
   }
 
@@ -93,11 +93,14 @@ class InboxNotifier extends StateNotifier<InboxListState> {
     }
   }
 
-  Future<void> completeItem(InboxItemModel item) async {
+  Future<bool> completeItem(InboxItemModel item) async {
     if (item.moduleCode != null && item.subjectKey != null) {
-      await _repo.completeTodo(item.moduleCode!, item.subjectKey!);
+      final completed = await _repo.completeTodo(item.moduleCode!, item.subjectKey!);
+      if (!completed) return false;
       await loadInbox();
+      return true;
     }
+    return false;
   }
 
   void _setupRealtime() {

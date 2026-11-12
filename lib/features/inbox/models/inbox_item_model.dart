@@ -1,5 +1,5 @@
 class InboxItemModel {
-  final int id;
+  final String id;
   final String title;
   final String source;
   final String sourceLabel;
@@ -25,7 +25,7 @@ class InboxItemModel {
 
   factory InboxItemModel.fromJson(Map<String, dynamic> json) {
     return InboxItemModel(
-      id: json['id'] as int? ?? json['task_id'] as int? ?? 0,
+      id: (json['id'] ?? json['task_id'] ?? json['subject_key'] ?? '').toString(),
       title: json['title'] as String? ?? json['subject'] as String? ?? 'Inbox Task',
       source: json['source'] as String? ?? json['module_code'] as String? ?? 'general',
       sourceLabel: json['source_label'] as String? ?? json['module_name'] as String? ?? json['source'] as String? ?? 'Task',

@@ -58,7 +58,7 @@ class TaskRepository {
       }
       return [];
     } catch (_) {
-      return [];
+      rethrow;
     }
   }
 

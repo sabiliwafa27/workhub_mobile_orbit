@@ -2,6 +2,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/realtime/reverb_service.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../tasks/providers/task_provider.dart';
+
+final projectTasksProvider = FutureProvider.family<List<TaskItemModel>, int>((ref, projectId) async {
+  final response = await ref.watch(apiClientProvider).dio.get('/projects/$projectId/tasks');
+  final data = response.data;
+  if (data is! Map || data['data'] is! List) {
+    throw const FormatException('Unexpected project tasks response');
+  }
+  return (data['data'] as List)
+      .map((item) => TaskItemModel.fromJson(Map<String, dynamic>.from(item as Map)))
+      .toList();
+});
 
 class ProjectItemModel {
   final int id;
@@ -56,7 +68,7 @@ class ProjectRepository {
       }
       return [];
     } catch (_) {
-      return [];
+      rethrow;
     }
   }
 
