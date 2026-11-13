@@ -71,13 +71,24 @@ jobs:
             sed -i '/pluginManagement {/a \    repositories {\n        google()\n        mavenCentral()\n        gradlePluginPortal()\n    }' android/settings.gradle
           fi
           if [ -f android/app/build.gradle.kts ]; then
-            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
-            grep -Eq 'compileSdk = 36' android/app/build.gradle.kts || { echo 'Could not set Android compileSdk to 36.' >&2; exit 1; }
+            sed -i -E 's/^([[:space:]]*)compileSdk[[:space:]]*=.*/\1compileSdk = 36/' android/app/build.gradle.kts
+            grep -Eq '^[[:space:]]*compileSdk[[:space:]]*=[[:space:]]*36([[:space:]]|$)' android/app/build.gradle.kts || {
+              echo 'Could not set Android compileSdk to 36 in android/app/build.gradle.kts.' >&2
+              cat android/app/build.gradle.kts >&2
+              exit 1
+            }
             printf '\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}\n' >> android/app/build.gradle.kts
           elif [ -f android/app/build.gradle ]; then
-            sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle
-            grep -Eq 'compileSdkVersion 36' android/app/build.gradle || { echo 'Could not set Android compileSdk to 36.' >&2; exit 1; }
+            sed -i -E 's/^([[:space:]]*)compileSdkVersion([[:space:]]+|[[:space:]]*=).*/\1compileSdkVersion 36/' android/app/build.gradle
+            grep -Eq '^[[:space:]]*compileSdkVersion[[:space:]]+36([[:space:]]|$)' android/app/build.gradle || {
+              echo 'Could not set Android compileSdk to 36 in android/app/build.gradle.' >&2
+              cat android/app/build.gradle >&2
+              exit 1
+            }
             printf '\nandroid {\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }\n}\n' >> android/app/build.gradle
+          else
+            echo 'Flutter did not generate an Android app Gradle build file.' >&2
+            exit 1
           fi
 
       - name: Get dependencies
