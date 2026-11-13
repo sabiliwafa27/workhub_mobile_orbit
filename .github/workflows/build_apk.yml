@@ -50,7 +50,17 @@ jobs:
         run: flutter create . --org net.kecapsawi --project-name workhub_mobile --platforms android,ios
 
       - name: Install Android API 36
-        run: sdkmanager "platforms;android-36"
+        run: |
+          sdk_root="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          sdkmanager_path="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$sdkmanager_path" ] && [ -d "$sdk_root/cmdline-tools" ]; then
+            sdkmanager_path="$(find "$sdk_root/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          fi
+          if [ -z "$sdkmanager_path" ] || [ ! -x "$sdkmanager_path" ]; then
+            echo "Android SDK manager was not found under $sdk_root/cmdline-tools." >&2
+            exit 1
+          fi
+          "$sdkmanager_path" "platforms;android-36"
 
       - name: Patch Gradle repositories and lint settings
         run: |
@@ -87,14 +97,22 @@ jobs:
           cache: true
 
       - name: Configure Shorebird app
+        id: shorebird-config
         if: github.event_name != 'pull_request'
         env:
           SHOREBIRD_APP_ID: ${{ secrets.SHOREBIRD_APP_ID }}
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
-          if [ -z "$SHOREBIRD_APP_ID" ]; then
-            echo 'Configure the SHOREBIRD_APP_ID repository secret before releasing.' >&2
-            exit 1
+          if [ -z "$SHOREBIRD_APP_ID" ] || [ -z "$SHOREBIRD_TOKEN" ]; then
+            if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              echo 'Manual Shorebird release or patch requires SHOREBIRD_APP_ID and SHOREBIRD_TOKEN repository secrets.' >&2
+              exit 1
+            fi
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Shorebird secrets are not configured; building a standard APK.'
+            exit 0
           fi
+          echo 'enabled=true' >> "$GITHUB_OUTPUT"
           printf 'app_id: %s\n' "$SHOREBIRD_APP_ID" > shorebird.yaml
           if ! rg -q '^  assets:' pubspec.yaml; then
             sed -i '/^  uses-material-design: true$/a\  assets:\n    - shorebird.yaml' pubspec.yaml
@@ -102,7 +120,7 @@ jobs:
           flutter pub get
 
       - name: Create Shorebird release
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.operation == 'release')
+        if: (github.event_name == 'push' && steps.shorebird-config.outputs.enabled == 'true') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'release')
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
@@ -113,7 +131,7 @@ jobs:
           shorebird release android --artifact apk --target-platform android-arm64 --build-number "$GITHUB_RUN_NUMBER"
 
       - name: Publish Shorebird APK release
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'release')
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.shorebird-config.outputs.enabled == 'true') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'release')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
@@ -122,6 +140,23 @@ jobs:
             Shorebird-enabled ARM64 release. Future Dart and Flutter UI fixes can be delivered as OTA patches.
             Commit: ${{ github.sha }}
           files: build/app/outputs/flutter-apk/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build standard APK without Shorebird
+        if: github.event_name == 'push' && steps.shorebird-config.outputs.enabled != 'true'
+        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
+
+      - name: Publish standard APK release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.shorebird-config.outputs.enabled != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: WorkHub Mobile v1.0.${{ github.run_number }}
+          body: |
+            ARM64 APK built without Shorebird. Configure SHOREBIRD_APP_ID and SHOREBIRD_TOKEN to enable OTA releases.
+            Commit: ${{ github.sha }}
+          files: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
