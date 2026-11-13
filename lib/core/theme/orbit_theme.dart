@@ -61,7 +61,7 @@ class OrbitTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: OrbitColors.scaffoldBackground,
+      scaffoldBackgroundColor: Colors.transparent,
       fontFamily: 'Roboto',
       visualDensity: VisualDensity.standard,
       appBarTheme: const AppBarTheme(
@@ -141,10 +141,15 @@ class OrbitTheme {
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: OrbitColors.primaryNavy,
-        foregroundColor: scheme.onPrimary,
+        // Keep-inspired large tonal create button, shared across pages.
+        backgroundColor: OrbitColors.bubbleBlue,
+        foregroundColor: OrbitColors.primaryNavy,
         elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        focusElevation: 3,
+        hoverElevation: 4,
+        highlightElevation: 1,
+        iconSize: 36,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 72,

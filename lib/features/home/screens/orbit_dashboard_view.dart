@@ -222,9 +222,8 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
 
     return Scaffold(
       backgroundColor: OrbitColors.scaffoldBackground,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: OrbitColors.primaryNavy,
-        foregroundColor: Colors.white,
+      floatingActionButton: FloatingActionButton.large(
+        tooltip: 'Create task or EC',
         onPressed: () async {
           final isEc = await showModalBottomSheet<bool>(
             context: context,

@@ -143,7 +143,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     });
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.large(
+        tooltip: 'Create task or EC',
         onPressed: () async {
           final isEc = await showModalBottomSheet<bool>(
               context: context,
@@ -171,7 +172,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         },
         child: const Icon(Icons.add),
       ),
-      backgroundColor: OrbitColors.scaffoldBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leadingWidth: 64,
         leading: Padding(
@@ -229,7 +230,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     decoration: const InputDecoration(
                         isDense: true,
                         prefixIcon: Icon(Icons.search),
-                        hintText: 'Search inbox')),
+                        hintText: 'Search name, phone, plate...')),
                 const SizedBox(height: 8),
                 Row(children: [
                   Expanded(
@@ -594,15 +595,43 @@ class InboxItemDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
         appBar: AppBar(title: Text(item.sourceLabel)),
         body: ListView(padding: const EdgeInsets.all(16), children: [
-          Text(item.title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          if (item.subtitle != null && item.subtitle!.isNotEmpty)
-            Text(item.subtitle!),
-          const SizedBox(height: 12),
-          Text('Status: ${item.status.replaceAll('_', ' ')}'),
-          const SizedBox(height: 6),
-          Text(item.createdAt),
-          if (item.logisticInDetail case final reference?)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: OrbitColors.cardSurface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white),
+              boxShadow: const [BoxShadow(color: Color(0x1606244D), blurRadius: 16, offset: Offset(0, 6))],
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const CircleAvatar(radius: 23, backgroundColor: OrbitColors.bubbleBlue,
+                    child: Icon(Icons.layers_outlined, color: OrbitColors.primaryNavy)),
+                const SizedBox(width: 12),
+                Expanded(child: Text(item.title, style: const TextStyle(fontSize: 22,
+                    fontWeight: FontWeight.w800, color: OrbitColors.textNavy))),
+              ]),
+              const SizedBox(height: 16),
+              if (item.subtitle != null && item.subtitle!.isNotEmpty) ...[
+                Text(item.subtitle!, style: const TextStyle(fontSize: 15, color: OrbitColors.textSecondary)),
+                const SizedBox(height: 10),
+              ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                decoration: BoxDecoration(color: OrbitColors.kpiGreenBg,
+                    borderRadius: BorderRadius.circular(999)),
+                child: Text(item.status.replaceAll('_', ' '),
+                    style: const TextStyle(color: Color(0xFF15803D))),
+              ),
+              const SizedBox(height: 10),
+              Row(children: [
+                const Icon(Icons.calendar_today_outlined, size: 18, color: OrbitColors.primaryNavy),
+                const SizedBox(width: 10),
+                Expanded(child: Text(item.createdAt, style: const TextStyle(color: OrbitColors.textSecondary))),
+              ]),
+            ]),
+          ),
+          const SizedBox(height: 12),          if (item.logisticInDetail case final reference?)
             TextButton.icon(
               icon: const Icon(Icons.open_in_new),
               label: const Text('Open Logistic In details'),

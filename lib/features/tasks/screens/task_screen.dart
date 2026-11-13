@@ -72,9 +72,11 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     final canManageEc =
         ref.watch(authProvider).user?.can('task.ec.manage') == true;
     final displayTasks = taskState.tasks;
+    final activeCount = displayTasks.where((task) => task.progressPercent < 100 && task.status != 'cancelled').length;
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.large(
+        tooltip: 'Create task',
         onPressed: () async {
           final created = await Navigator.of(context).push<bool>(
               MaterialPageRoute(builder: (_) => const CreateWorkItemScreen()));
@@ -83,8 +85,17 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
         },
         child: const Icon(Icons.add),
       ),
-      backgroundColor: OrbitColors.scaffoldBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        leadingWidth: 64,
+        leading: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 5, 0, 5),
+          child: DecoratedBox(
+            decoration: BoxDecoration(color: OrbitColors.primaryNavy,
+                borderRadius: BorderRadius.circular(16)),
+            child: const Icon(Icons.assignment_turned_in_outlined, color: Colors.white),
+          ),
+        ),
         title: const Text('Task Board'),
         actions: [
           IconButton(
@@ -105,6 +116,62 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
           padding:
               const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 90),
           children: [
+            // Status Header Info
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: OrbitColors.cardSurface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: OrbitColors.cardBorder),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: OrbitColors.bubbleBlue,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.assignment_outlined,
+                      color: OrbitColors.primaryNavy,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Active Assigned Tasks',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: OrbitColors.textNavy,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$activeCount task${activeCount == 1 ? '' : 's'} in progress',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: OrbitColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('Search, filters & priorities'),
+              children: [
             const Text('Priority',
                 style: TextStyle(
                     fontSize: 16,
@@ -290,58 +357,8 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
               },
             ),
             const SizedBox(height: 12),
-            // Status Header Info
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: OrbitColors.cardSurface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: OrbitColors.cardBorder),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: OrbitColors.bubbleBlue,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.assignment_outlined,
-                      color: OrbitColors.primaryNavy,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Active Assigned Tasks',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: OrbitColors.textNavy,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${displayTasks.length} task${displayTasks.length == 1 ? '' : 's'} in progress',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: OrbitColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
-            const SizedBox(height: 14),
-
             // Tasks List
             if (taskState.isLoading)
               const Center(
@@ -430,114 +447,43 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   }
 
   Widget _buildTaskCard(TaskItemModel task) {
-    Color priorityColor = OrbitColors.kpiGreen;
-    Color priorityBg = OrbitColors.kpiGreenBg;
-    if (task.priority.toLowerCase() == 'urgent') {
-      priorityColor = OrbitColors.kpiRed;
-      priorityBg = OrbitColors.kpiRedBg;
-    } else if (task.priority.toLowerCase() == 'high') {
-      priorityColor = OrbitColors.kpiOrange;
-      priorityBg = OrbitColors.kpiOrangeBg;
-    }
-
     return InkWell(
       onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => TaskDetailScreen(taskId: task.id))),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: OrbitColors.cardSurface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: OrbitColors.cardBorder),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: OrbitColors.cardBorder)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: task.progressPercent >= 100
-                        ? OrbitColors.primaryNavy
-                        : Colors.transparent,
-                    border: Border.all(
-                      color: task.progressPercent >= 100
-                          ? OrbitColors.primaryNavy
-                          : OrbitColors.textMuted,
-                      width: 1.5,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: task.progressPercent >= 100
-                      ? const Icon(Icons.check, size: 19, color: Colors.white)
-                      : null,
+            Row(children: [
+              Container(
+                width: 20, height: 20,
+                decoration: BoxDecoration(
+                  color: task.progressPercent >= 100 ? OrbitColors.primaryNavy : Colors.white,
+                  border: Border.all(color: OrbitColors.textMuted),
+                  borderRadius: BorderRadius.circular(5),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(task.title, style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: OrbitColors.textNavy,
-                        decoration: task.progressPercent >= 100
-                            ? TextDecoration.lineThrough
-                            : null,
-                      )),
-                      if (task.description.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(task.description, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12, color: OrbitColors.textSecondary)),
-                      ],
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                        decoration: BoxDecoration(color: OrbitColors.bubbleBlue, borderRadius: BorderRadius.circular(999)),
-                        child: Text('${task.progressPercent}% · ${task.progressPercent >= 100 ? 'Complete' : 'In progress'}',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: OrbitColors.textSecondary)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: priorityBg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(task.priority.toUpperCase(),
-                          style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: priorityColor)),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.calendar_today_rounded,
-                            size: 12, color: OrbitColors.textMuted),
-                        const SizedBox(width: 4),
-                        Text(task.dueDate,
-                            style: const TextStyle(
-                                fontSize: 11,
-                                color: OrbitColors.textMuted,
-                                fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                child: task.progressPercent >= 100
+                    ? const Icon(Icons.check, size: 17, color: Colors.white) : null,
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: Text(task.title, style: TextStyle(
+                fontSize: 14,
+                color: task.progressPercent >= 100 ? OrbitColors.textSecondary : OrbitColors.textPrimary,
+                decoration: task.progressPercent >= 100 ? TextDecoration.lineThrough : null,
+              ))),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(color: OrbitColors.bubbleBlue,
+                    borderRadius: BorderRadius.circular(999)),
+                child: Text('${task.progressPercent}% · ${task.progressPercent >= 100 ? 'Selesai' : task.progressPercent == 0 ? 'Belum Mulai' : 'In progress'}',
+                    style: const TextStyle(fontSize: 11, color: OrbitColors.textSecondary)),
+              ),
+            ]),
             if (task.attachmentCount > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -547,63 +493,21 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                       '${task.attachmentCount} attachment${task.attachmentCount == 1 ? '' : 's'}')
                 ]),
               ),
-            const SizedBox(height: 14),
-
-            // Progress Indicator
+            // Actions
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 if (task.priorityEligible && !task.isPersonalPriority)
                   IconButton(
                     tooltip: 'Add to Priority',
                     icon: const Icon(Icons.push_pin_outlined),
                     onPressed: () async {
-                      await ref
-                          .read(taskRepositoryProvider)
-                          .addPriority(task.id);
+                      await ref.read(taskRepositoryProvider).addPriority(task.id);
+                      if (!mounted) return;
                       _reloadPriorities();
                       ref.read(taskNotifierProvider.notifier).loadTasks();
                     },
                   ),
-                const Text(
-                  'Progress',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: OrbitColors.textSecondary),
-                ),
-                Text(
-                  '${task.progressPercent}%',
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: OrbitColors.textNavy),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: task.progressPercent / 100.0,
-                minHeight: 6,
-                backgroundColor: OrbitColors.scaffoldBackground,
-                valueColor: const AlwaysStoppedAnimation<Color>(
-                    OrbitColors.brandOrange),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            if (task.projectName != null)
-              Text(task.projectName!,
-                  style: const TextStyle(color: OrbitColors.textSecondary)),
-            if (task.assignees.isNotEmpty)
-              Text(task.assignees.join(', '),
-                  style: const TextStyle(color: OrbitColors.textSecondary)),
-            // Actions
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
                 if (task.rowAction == 'request_review')
                   OutlinedButton(
                     onPressed: () async {

@@ -160,31 +160,33 @@ class _InboxDiscussionState extends ConsumerState<InboxDiscussion> {
       if (hasMoreOlder ?? discussion.hasOlder)
         TextButton(onPressed: loadingOlder ? null : () => loadOlder(discussion), child: Text(loadingOlder ? 'Loading…' : olderFailed ? 'Unable to load older comments. Retry' : 'Load older comments')),
       if (discussion.comments.isEmpty && olderComments.isEmpty) const Text('No comments yet.'),
+      if (olderComments.isNotEmpty || discussion.comments.isNotEmpty)
+        Card(child: Column(children: [
       for (final item in [...olderComments, ...discussion.comments]) Builder(builder: (context) {
         final author = item['author'];
         final name = author is Map ? (author['name'] ?? '').toString() : '';
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
+        return ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             leading: CircleAvatar(
               backgroundColor: OrbitColors.bubbleBlue,
               child: Text(name.isEmpty ? 'U' : name.substring(0, 1).toUpperCase(), style: const TextStyle(color: OrbitColors.primaryNavy, fontWeight: FontWeight.w700)),
             ),
             title: Text(name.isEmpty ? 'User' : name, style: const TextStyle(fontWeight: FontWeight.w700, color: OrbitColors.textNavy)),
-            subtitle: Padding(padding: const EdgeInsets.only(top: 4), child: Text((item['body'] ?? '').toString())),
-          ),
+            subtitle: Padding(padding: const EdgeInsets.only(top: 8), child: Text((item['body'] ?? '').toString(), style: const TextStyle(fontSize: 15, color: OrbitColors.textPrimary))),
         );
       }),
+        ])),
       if (discussion.canComment) ...[
         const SizedBox(height: 10),
         TextField(
           controller: comment,
           maxLength: 5000,
-          minLines: 2,
+          minLines: 1,
           maxLines: 4,
           enabled: !sending,
           decoration: InputDecoration(
             labelText: 'Add a comment',
+            hintText: 'Write a comment...',
             alignLabelWithHint: true,
             prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
             filled: true,

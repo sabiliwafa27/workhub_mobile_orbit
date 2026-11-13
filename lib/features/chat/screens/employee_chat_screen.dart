@@ -43,10 +43,10 @@ class _EmployeeChatScreenState extends ConsumerState<EmployeeChatScreen> {
     return Scaffold(
       backgroundColor: OrbitColors.scaffoldBackground,
       appBar: AppBar(title: const Text('Chats', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: OrbitColors.textNavy)), actions: [PopupMenuButton<String>(onSelected: (value) { if (value == 'logout') ref.read(authProvider.notifier).logout(); }, itemBuilder: (_) => [const PopupMenuItem(value: 'logout', child: Text('Log out'))])]),
-      floatingActionButton: FloatingActionButton(onPressed: () async {
+      floatingActionButton: FloatingActionButton.large(onPressed: () async {
         final selected = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(builder: (_) => const EmployeePickerScreen()));
         if (selected != null && mounted) open((selected['id'] as num).toInt(), selected['name'].toString());
-      }, backgroundColor: OrbitColors.primaryNavy, foregroundColor: Colors.white, child: const Icon(Icons.add)),
+      }, tooltip: 'New chat', child: const Icon(Icons.add)),
       body: Column(children: [
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: TextField(controller: search, onChanged: (_) => setState(() {}), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search'))),
         Row(children: [const SizedBox(width: 16), ChoiceChip(label: const Text('All'), selected: !unread, selectedColor: OrbitColors.bubbleBlue, showCheckmark: false, onSelected: (_) => setState(() => unread = false)), const SizedBox(width: 8), ChoiceChip(label: const Text('Unread'), selected: unread, selectedColor: OrbitColors.bubbleBlue, showCheckmark: false, onSelected: (_) => setState(() => unread = true))]),

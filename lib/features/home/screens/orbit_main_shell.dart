@@ -285,12 +285,12 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     ];
 
     return Scaffold(
-      backgroundColor: OrbitColors.scaffoldBackground,
+      backgroundColor: Colors.transparent,
       body: IndexedStack(
         index: _currentIndex,
         children: pages,
       ),
-      bottomNavigationBar: _buildFloatingBottomNav(inboxCount),
+      bottomNavigationBar: SafeArea(top: false, child: _buildFloatingBottomNav(inboxCount)),
     );
   }
 
@@ -353,11 +353,11 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     int? badgeCount,
   }) {
     final isSelected = _currentIndex == index;
-    return InkWell(
+    return Expanded(child: InkWell(
       onTap: () => _onBottomNavTapped(index),
       borderRadius: BorderRadius.circular(999),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         child: Container(
           decoration: BoxDecoration(
             color: isSelected ? const Color(0xFFDFEAFF) : Colors.transparent,
@@ -418,6 +418,6 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
           ),
         ),
       ),
-    );
+    ));
   }
 }

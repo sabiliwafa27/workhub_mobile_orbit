@@ -20,14 +20,14 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     final displayProjects = projectState.projects;
 
     return Scaffold(
-      backgroundColor: WhatsAppColors.background,
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         color: WhatsAppColors.tealGreen,
         onRefresh: () async {
           await ref.read(projectNotifierProvider.notifier).loadProjects();
         },
         child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 12, bottom: 24),
           children: [
             // Header Banner
             Padding(
@@ -75,14 +75,18 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Text(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(color: const Color(0xFFD6DFFF), borderRadius: BorderRadius.circular(999)),
+                child: Text(
                 'COMPANY INITIATIVES (${displayProjects.length})',
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.3,
-                  color: WhatsAppColors.primaryGreen,
+                  color: OrbitColors.textNavy,
                 ),
+              ),
               ),
             ),
 
@@ -152,116 +156,62 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   }
 
   Widget _buildProjectCard(ProjectItemModel project) {
+    final isMom = project.name.toLowerCase().contains('mom');
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 62,
-                height: 62,
-                decoration: BoxDecoration(
-                  color: WhatsAppColors.navIndicatorBg,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Icon(
-                  project.name.toLowerCase().contains('mom')
-                      ? Icons.layers_outlined
-                      : project.name.toLowerCase().contains('test')
-                          ? Icons.code_rounded
-                          : Icons.hub_outlined,
-                  color: WhatsAppColors.primaryGreen,
-                  size: 30,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      project.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: WhatsAppColors.titleText,
-                      ),
-                    ),
-                    if (project.description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        project.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: WhatsAppColors.subtitleText,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    Row(children: [
-                      const Icon(Icons.check_circle_outline,
-                          size: 18, color: WhatsAppColors.tealGreen),
-                      const SizedBox(width: 8),
-                      Flexible(child: Text('${project.completedTasks} completed',
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13,
-                              color: WhatsAppColors.subtitleText))),
-                    ]),
-                    const SizedBox(height: 6),
-                    Row(children: [
-                      const Icon(Icons.pending_actions,
-                          size: 18, color: WhatsAppColors.iconMuted),
-                      const SizedBox(width: 8),
-                      Flexible(child: Text('${project.activeTasks} active',
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13,
-                              color: WhatsAppColors.subtitleText))),
-                    ]),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: WhatsAppColors.navIndicatorBg,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text('${project.progress}%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: WhatsAppColors.darkGreen)),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: 86,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: project.progress.clamp(0, 100) / 100,
-                        backgroundColor: WhatsAppColors.chipBorder,
-                        valueColor: const AlwaysStoppedAnimation<Color>(WhatsAppColors.darkGreen),
-                        minHeight: 6,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        CircleAvatar(
+          radius: 23,
+          backgroundColor: isMom ? const Color(0xFFF7DEED) : OrbitColors.bubbleBlue,
+          child: Icon(isMom ? Icons.layers_outlined : Icons.code_rounded,
+              color: OrbitColors.textNavy, size: 26),
+        ),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(project.name, style: const TextStyle(fontSize: 17,
+              fontWeight: FontWeight.w800, color: OrbitColors.textNavy)),
+          if (project.description.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(project.description, style: const TextStyle(fontSize: 14,
+                color: OrbitColors.textSecondary)),
+          ],
+          const SizedBox(height: 12),
+          Wrap(spacing: 12, runSpacing: 6, children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF009688)),
+              const SizedBox(width: 6),
+              Text('${project.completedTasks} completed', style: const TextStyle(
+                  fontSize: 12, color: OrbitColors.textSecondary)),
+            ]),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.pending_actions, size: 16, color: OrbitColors.textSecondary),
+              const SizedBox(width: 6),
+              Text('${project.activeTasks} active', style: const TextStyle(
+                  fontSize: 12, color: OrbitColors.textSecondary)),
+            ]),
+          ]),
+        ])),
+        const SizedBox(width: 10),
+        Column(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(color: const Color(0xFFD1FACB),
+                borderRadius: BorderRadius.circular(999)),
+            child: Text('${project.progress}%', style: const TextStyle(
+                fontWeight: FontWeight.w800, color: Color(0xFF14820B))),
           ),
-        ],
-      ),
+          const SizedBox(height: 10),
+          SizedBox(width: 66, child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(value: project.progress.clamp(0, 100) / 100,
+                minHeight: 6, backgroundColor: const Color(0xFFD9DEED),
+                color: const Color(0xFF14820B)),
+          )),
+        ]),
+      ]),
     );
   }
 }
-
 class ProjectTasksScreen extends ConsumerWidget {
   final ProjectItemModel project;
 
@@ -272,7 +222,8 @@ class ProjectTasksScreen extends ConsumerWidget {
     final tasks = ref.watch(projectTasksProvider(project.id));
     return Scaffold(
       appBar: AppBar(title: Text(project.name)),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.large(
+        tooltip: 'Create project task',
         onPressed: () async {
           final created = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateWorkItemScreen(projectId: project.id)));
           if (created == true && context.mounted) ref.invalidate(projectTasksProvider(project.id));

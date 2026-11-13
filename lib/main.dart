@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/orbit_theme.dart';
+import 'core/theme/orbit_backdrop.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/home/screens/orbit_main_shell.dart';
@@ -25,6 +26,7 @@ class WorkHubApp extends ConsumerWidget {
       title: 'Orbit WorkHub',
       debugShowCheckedModeBanner: false,
       theme: OrbitTheme.lightTheme,
+      builder: (context, child) => OrbitBackdrop(child: child ?? const SizedBox.shrink()),
       home: authState.isAuthenticated ? const OrbitMainShell() : const LoginScreen(),
     );
   }
