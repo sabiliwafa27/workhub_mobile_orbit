@@ -94,6 +94,16 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Verify file_picker Android SDK compatibility
+        run: |
+          file_picker_version="$(awk '/^  file_picker:$/ { found = 1; next } found && /version:/ { gsub(/"/, "", $2); print $2; exit }' pubspec.lock)"
+          minimum_version="10.3.3"
+          if [ -z "$file_picker_version" ] || [ "$(printf '%s\n' "$minimum_version" "$file_picker_version" | sort -V | head -n1)" != "$minimum_version" ]; then
+            echo "file_picker $file_picker_version is too old; Android API 36 support requires file_picker >= $minimum_version." >&2
+            exit 1
+          fi
+          echo "Resolved file_picker $file_picker_version (Android compileSdk follows the Flutter SDK)."
+
       - name: Run Flutter tests
         run: flutter test --no-pub
 
