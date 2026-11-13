@@ -219,7 +219,7 @@ void main() {
     expect(find.text('No assigned tasks'), findsNothing);
   });
 
-  testWidgets('navy dashboard button opens EC and task creation choices',
+  testWidgets('large tonal dashboard button opens EC and task creation choices',
       (tester) async {
     final api = ApiClient(
         customDio: Dio()..httpClientAdapter = _Adapter(),
@@ -227,16 +227,17 @@ void main() {
     await tester.pumpWidget(ProviderScope(
         overrides: [apiClientProvider.overrideWithValue(api)],
         child: MaterialApp(
+            theme: OrbitTheme.lightTheme,
             home: OrbitDashboardView(
                 onOpenSearch: () {},
                 onOpenNotifications: () {},
                 onOpenCheckIn: () {}))));
     await tester.pumpAndSettle();
-    expect(
-        tester
-            .widget<FloatingActionButton>(find.byType(FloatingActionButton))
-            .backgroundColor,
-        OrbitColors.primaryNavy);
+    final createButton = find.byType(FloatingActionButton);
+    final buttonSurface = find.descendant(
+        of: createButton, matching: find.byType(Material));
+    expect(tester.widget<Material>(buttonSurface).color, OrbitColors.bubbleBlue);
+    expect(tester.getSize(createButton), const Size(96, 96));
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Create EC'));
