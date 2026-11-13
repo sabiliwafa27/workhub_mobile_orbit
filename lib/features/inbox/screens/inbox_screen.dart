@@ -144,20 +144,39 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.large(
-        tooltip: 'Create task or EC',
+        tooltip: 'Create task, EC or chat',
         onPressed: () async {
-          final isEc = await showModalBottomSheet<bool>(
+          final action = await showModalBottomSheet<String>(
               context: context,
               builder: (context) => SafeArea(
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                     ListTile(
                         title: const Text('Create task'),
-                        onTap: () => Navigator.pop(context, false)),
+                        onTap: () => Navigator.pop(context, 'task')),
                     ListTile(
                         title: const Text('Create EC'),
-                        onTap: () => Navigator.pop(context, true)),
+                        onTap: () => Navigator.pop(context, 'ec')),
+                    ListTile(
+                        leading: const Icon(Icons.chat_bubble_outline_rounded),
+                        title: const Text('New chat / DM'),
+                        onTap: () => Navigator.pop(context, 'chat')),
                   ])));
-          if (isEc == null || !context.mounted) return;
+          if (action == null || !context.mounted) return;
+          if (action == 'chat') {
+            final employee = await Navigator.of(context)
+                .push<Map<String, dynamic>>(MaterialPageRoute(
+                    builder: (_) => const EmployeePickerScreen()));
+            if (employee == null || !context.mounted) return;
+            await Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => EmployeeMessagesScreen(
+                    id: (employee['id'] as num).toInt(),
+                    name: employee['name'].toString())));
+            if (context.mounted) {
+              ref.read(inboxNotifierProvider.notifier).loadInbox();
+            }
+            return;
+          }
+          final isEc = action == 'ec';
           final created = await Navigator.of(context).push<bool>(
               MaterialPageRoute(
                   builder: (_) => CreateWorkItemScreen(isEc: isEc)));
