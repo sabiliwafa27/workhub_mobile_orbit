@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
-import '../../auth/providers/auth_provider.dart';
+import '../../../core/realtime/reverb_service.dart';
 import '../providers/inbox_provider.dart';
 
 typedef _DiscussionKey = ({String module, String subjectKey});
@@ -56,10 +56,37 @@ class _InboxDiscussionState extends ConsumerState<InboxDiscussion> {
   int? oldestId;
   int historyGeneration = 0;
   List<dynamic> olderComments = [];
+  void Function()? _cancelRealtimeSubscription;
   _DiscussionKey get key => (module: widget.module, subjectKey: widget.subjectKey);
 
   @override
-  void dispose() { comment.dispose(); super.dispose(); }
+  void initState() {
+    super.initState();
+    _subscribeToRealtime();
+  }
+
+  void _subscribeToRealtime() {
+    _cancelRealtimeSubscription?.call();
+    final channel = 'private-collaboration.${widget.module}.${widget.subjectKey}';
+    _cancelRealtimeSubscription = ref.read(reverbServiceProvider).subscribe(channel, (_) {
+      if (mounted) refreshDiscussion();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant InboxDiscussion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.module != widget.module || oldWidget.subjectKey != widget.subjectKey) {
+      _subscribeToRealtime();
+    }
+  }
+
+  @override
+  void dispose() {
+    _cancelRealtimeSubscription?.call();
+    comment.dispose();
+    super.dispose();
+  }
 
   void refreshDiscussion() {
     historyGeneration++;

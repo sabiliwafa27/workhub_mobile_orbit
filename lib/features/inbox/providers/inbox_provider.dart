@@ -181,6 +181,7 @@ class InboxNotifier extends StateNotifier<InboxListState> {
   String _status = 'pending';
   String _search = '';
   int _requestNumber = 0;
+  final List<void Function()> _cancelRealtimeSubscriptions = [];
 
   InboxNotifier(this._repo, this._reverb, this._userId) : super(InboxListState()) {
     loadInbox();
@@ -216,14 +217,21 @@ class InboxNotifier extends StateNotifier<InboxListState> {
 
   void _setupRealtime() {
     if (_userId != null) {
-      _reverb.subscribe('private-App.Models.User.$_userId', (eventData) {
+      _cancelRealtimeSubscriptions.add(_reverb.subscribe('private-inbox.user.$_userId', (eventData) {
         loadInbox();
-      });
+      }));
+      _cancelRealtimeSubscriptions.add(_reverb.subscribe('private-App.Models.User.$_userId', (eventData) {
+        loadInbox();
+      }));
     }
+  }
 
-    _reverb.subscribe('inbox-updates', (eventData) {
-      loadInbox();
-    });
+  @override
+  void dispose() {
+    for (final cancel in _cancelRealtimeSubscriptions) {
+      cancel();
+    }
+    super.dispose();
   }
 }
 
