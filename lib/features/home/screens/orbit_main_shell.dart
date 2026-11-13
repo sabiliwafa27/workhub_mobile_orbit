@@ -207,12 +207,12 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Close', style: TextStyle(color: OrbitColors.textSecondary)),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               _handleLogout();
             },
-            style: ElevatedButton.styleFrom(
+            style: FilledButton.styleFrom(
               backgroundColor: OrbitColors.accentCoral,
               foregroundColor: Colors.white,
             ),

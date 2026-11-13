@@ -294,7 +294,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                 child: const Text('Request Review', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
               ),
               const SizedBox(width: 8),
-              ElevatedButton.icon(
+              FilledButton.icon(
                 onPressed: () {
                   ref.read(taskNotifierProvider.notifier).completeTask(task.id);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -303,11 +303,9 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                 },
                 icon: const Icon(Icons.check, size: 14),
                 label: const Text('Complete', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
+                style: FilledButton.styleFrom(
                   backgroundColor: OrbitColors.primaryNavy,
                   foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 ),
               ),

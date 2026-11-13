@@ -141,12 +141,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Later', style: TextStyle(color: ErpColors.textSecondary)),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: _startUpdate,
-            style: ElevatedButton.styleFrom(
+            style: FilledButton.styleFrom(
               backgroundColor: ErpColors.primaryNavy,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             ),
             child: const Text('Update Now'),
           ),

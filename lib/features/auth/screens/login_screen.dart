@@ -176,16 +176,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 20),
 
                       // Submit button
-                      ElevatedButton(
+                      FilledButton(
                         onPressed: authState.isLoading ? null : _submit,
-                        style: ElevatedButton.styleFrom(
+                        style: FilledButton.styleFrom(
                           backgroundColor: ErpColors.primaryNavy,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          elevation: 0,
                         ),
                         child: authState.isLoading
                             ? const SizedBox(
