@@ -173,10 +173,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       ),
       backgroundColor: OrbitColors.scaffoldBackground,
       appBar: AppBar(
+        leadingWidth: 64,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16, top: 5, bottom: 5),
+          child: Container(
+            decoration: BoxDecoration(
+              color: OrbitColors.primaryNavy,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.chat_bubble_outline_rounded,
+                color: Colors.white, size: 24),
+          ),
+        ),
         title: const Text(
-          'Inbox',
+          'Unified Inbox',
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 22,
             fontWeight: FontWeight.w800,
             color: OrbitColors.textNavy,
           ),
@@ -273,14 +285,22 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     },
                   )),
                 ]),
-                Align(
-                    alignment: Alignment.centerLeft,
-                    child: FilterChip(
-                      label: const Text('Unread only'),
-                      selected: _unreadOnly,
-                      onSelected: (value) =>
-                          setState(() => _unreadOnly = value),
-                    )),
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  decoration: BoxDecoration(
+                    color: OrbitColors.bubbleBlue,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: SwitchListTile(
+                    title: const Text('Unread only',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: OrbitColors.textNavy)),
+                    value: _unreadOnly,
+                    onChanged: (value) => setState(() => _unreadOnly = value),
+                    activeColor: OrbitColors.primaryNavy,
+                  ),
+                ),
                 if (_selectedSource != 'All' ||
                     _unreadOnly ||
                     _search.isNotEmpty ||
@@ -392,10 +412,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                               : ListView.separated(
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.only(bottom: 90),
+                                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 96),
                                   itemCount: filteredItems.length,
                                   separatorBuilder: (_, __) =>
-                                      const Divider(height: 1, indent: 64),
+                                      const SizedBox(height: 8),
                                   itemBuilder: (context, index) {
                                     final item = filteredItems[index];
                                     return _buildInboxCard(item);
@@ -424,8 +444,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                         ? Icons.alternate_email
                         : Icons.task_alt_outlined;
     return Material(
-        color: Colors.white,
+        color: OrbitColors.cardSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: OrbitColors.cardBorder),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
+          borderRadius: BorderRadius.circular(20),
           onTap: () {
             if (item.moduleCode == 'employee-chat') {
               final conversationId = int.tryParse(item.subjectKey ?? '');
@@ -474,7 +500,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     : InboxItemDetailScreen(item: item)));
           },
           child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: Row(children: [
                 CircleAvatar(
                     radius: 18,

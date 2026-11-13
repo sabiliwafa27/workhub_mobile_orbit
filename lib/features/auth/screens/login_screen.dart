@@ -51,17 +51,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authProvider);
 
     return Scaffold(
-      backgroundColor: ErpColors.primaryNavy,
+      backgroundColor: ErpColors.scaffoldBackground,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
             child: Card(
-              elevation: 4,
+              elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
+                side: const BorderSide(color: ErpColors.border),
               ),
-              color: Colors.white,
+              color: ErpColors.cardSurface,
               child: Padding(
                 padding: const EdgeInsets.all(28.0),
                 child: Form(

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/orbit_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/inbox_provider.dart';
 
@@ -105,8 +106,29 @@ class _LogisticInOfficerFormState extends ConsumerState<LogisticInOfficerForm> {
     final qc = widget.role == 'QC';
     final bm = widget.role == 'BM';
     return Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('${widget.role} officer input', style: Theme.of(context).textTheme.titleMedium),
-      ListTile(contentPadding: EdgeInsets.zero, title: const Text('Expiry date'), subtitle: Text(expiry?.toIso8601String().split('T').first ?? 'Select date'),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: OrbitColors.cardSurface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: OrbitColors.cardBorder),
+        ),
+        child: Row(children: [
+          const CircleAvatar(backgroundColor: OrbitColors.bubbleBlue,
+              child: Icon(Icons.fact_check_outlined,
+                  color: OrbitColors.primaryNavy)),
+          const SizedBox(width: 12),
+          Expanded(child: Text('${widget.role} officer input',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: OrbitColors.textNavy))),
+        ]),
+      ),
+      const SizedBox(height: 12),
+      ListTile(leading: const Icon(Icons.calendar_today_outlined,
+          color: OrbitColors.primaryNavy), contentPadding: EdgeInsets.zero,
+        title: const Text('Expiry date'), subtitle: Text(expiry?.toIso8601String().split('T').first ?? 'Select date'),
         onTap: saving || uncertain || submitted ? null : () async {
           final chosen = await showDatePicker(context: context, initialDate: expiry ?? DateTime.now(), firstDate: DateTime(1900), lastDate: DateTime(2100));
           if (chosen != null && mounted) setState(() => expiry = chosen);

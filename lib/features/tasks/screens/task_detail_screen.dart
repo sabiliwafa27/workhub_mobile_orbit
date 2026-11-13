@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../inbox/screens/discussion_panel.dart';
 import '../../inbox/providers/inbox_provider.dart';
+import '../../../core/theme/orbit_theme.dart';
 import '../providers/task_provider.dart';
 
 final _taskDetailProvider = FutureProvider.autoDispose
@@ -62,8 +63,37 @@ class TaskDetailScreen extends ConsumerWidget {
               ? task['attachments'] as List
               : const [];
           return ListView(padding: const EdgeInsets.all(16), children: [
-            Text((task['title'] ?? 'Task').toString(),
-                style: Theme.of(context).textTheme.headlineSmall),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: OrbitColors.cardSurface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: OrbitColors.cardBorder),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: OrbitColors.bubbleBlue,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.task_alt_rounded,
+                        color: OrbitColors.primaryNavy),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text((task['title'] ?? 'Task').toString(),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: OrbitColors.textNavy)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
             if (status != null)
               Chip(
                   avatar: const Icon(Icons.circle, size: 12),
@@ -84,21 +114,25 @@ class TaskDetailScreen extends ConsumerWidget {
             ],
             if (names.isNotEmpty)
               ListTile(
+                  leading: const Icon(Icons.people_outline, color: OrbitColors.primaryNavy),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Assignees'),
                   subtitle: Text(names)),
             if (task['due_date'] != null)
               ListTile(
+                  leading: const Icon(Icons.calendar_today_outlined, color: OrbitColors.primaryNavy),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Due date'),
                   subtitle: Text(task['due_date'].toString().split('T').first)),
             if (project is Map && project['name'] != null)
               ListTile(
+                  leading: const Icon(Icons.folder_outlined, color: OrbitColors.primaryNavy),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Project'),
                   subtitle: Text(project['name'].toString())),
             if (priority != null || complexity != null)
               ListTile(
+                  leading: const Icon(Icons.flag_outlined, color: OrbitColors.primaryNavy),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Priority / complexity'),
                   subtitle: Text(
@@ -121,7 +155,17 @@ class TaskDetailScreen extends ConsumerWidget {
                 ),
             ],
             const Divider(height: 32),
-            Text('Discussion', style: Theme.of(context).textTheme.titleMedium),
+            Row(children: [
+              const CircleAvatar(
+                radius: 19,
+                backgroundColor: OrbitColors.bubbleBlue,
+                child: Icon(Icons.chat_bubble_outline_rounded,
+                    color: OrbitColors.primaryNavy, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Text('Discussion', style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800, color: OrbitColors.textNavy)),
+            ]),
             const SizedBox(height: 8),
             InboxDiscussion(module: 'task', subjectKey: taskId.toString()),
           ]);

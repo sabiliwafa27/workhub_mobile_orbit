@@ -85,14 +85,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
       ),
       backgroundColor: OrbitColors.scaffoldBackground,
       appBar: AppBar(
-        title: const Text(
-          'My Tasks',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: OrbitColors.textNavy,
-          ),
-        ),
+        title: const Text('Task Board'),
         actions: [
           IconButton(
             icon:
@@ -301,7 +294,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: OrbitColors.cardSurface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: OrbitColors.cardBorder),
               ),
@@ -371,7 +364,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                 padding:
                     const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: OrbitColors.cardSurface,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: OrbitColors.cardBorder),
                 ),
@@ -451,78 +444,100 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
       onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => TaskDetailScreen(taskId: task.id))),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          color: OrbitColors.cardSurface,
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: OrbitColors.cardBorder),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x04000000),
-              blurRadius: 6,
-              offset: Offset(0, 2),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
-                    color: priorityBg,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    task.priority.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: priorityColor,
+                    color: task.progressPercent >= 100
+                        ? OrbitColors.primaryNavy
+                        : Colors.transparent,
+                    border: Border.all(
+                      color: task.progressPercent >= 100
+                          ? OrbitColors.primaryNavy
+                          : OrbitColors.textMuted,
+                      width: 1.5,
                     ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: task.progressPercent >= 100
+                      ? const Icon(Icons.check, size: 19, color: Colors.white)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(task.title, style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: OrbitColors.textNavy,
+                        decoration: task.progressPercent >= 100
+                            ? TextDecoration.lineThrough
+                            : null,
+                      )),
+                      if (task.description.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(task.description, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12, color: OrbitColors.textSecondary)),
+                      ],
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(color: OrbitColors.bubbleBlue, borderRadius: BorderRadius.circular(999)),
+                        child: Text('${task.progressPercent}% · ${task.progressPercent >= 100 ? 'Complete' : 'In progress'}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: OrbitColors.textSecondary)),
+                      ),
+                    ],
                   ),
                 ),
-                Row(
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Icon(Icons.calendar_today_rounded,
-                        size: 12, color: OrbitColors.textMuted),
-                    const SizedBox(width: 4),
-                    Text(
-                      task.dueDate,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: OrbitColors.textMuted,
-                        fontWeight: FontWeight.w500,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: priorityBg,
+                        borderRadius: BorderRadius.circular(999),
                       ),
+                      child: Text(task.priority.toUpperCase(),
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: priorityColor)),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_today_rounded,
+                            size: 12, color: OrbitColors.textMuted),
+                        const SizedBox(width: 4),
+                        Text(task.dueDate,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: OrbitColors.textMuted,
+                                fontWeight: FontWeight.w500)),
+                      ],
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              task.title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: OrbitColors.textNavy,
-              ),
-            ),
-            if (task.description.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                task.description,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: OrbitColors.textSecondary,
-                  height: 1.3,
-                ),
-              ),
-            ],
             if (task.attachmentCount > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 8),

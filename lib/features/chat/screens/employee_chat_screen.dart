@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/theme/orbit_theme.dart';
 
 class EmployeeChatScreen extends ConsumerStatefulWidget {
   const EmployeeChatScreen({super.key});
@@ -40,18 +41,18 @@ class _EmployeeChatScreenState extends ConsumerState<EmployeeChatScreen> {
   Widget build(BuildContext context) {
     final filtered = chats.where((item) => item['name'].toString().toLowerCase().contains(search.text.toLowerCase()) && (!unread || (item['unread_count'] as num? ?? 0) > 0)).toList();
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(backgroundColor: Colors.white, elevation: 0, title: const Text('Chats', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF111B21))), actions: [PopupMenuButton<String>(onSelected: (value) { if (value == 'logout') ref.read(authProvider.notifier).logout(); }, itemBuilder: (_) => [const PopupMenuItem(value: 'logout', child: Text('Log out'))])]),
+      backgroundColor: OrbitColors.scaffoldBackground,
+      appBar: AppBar(title: const Text('Chats', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: OrbitColors.textNavy)), actions: [PopupMenuButton<String>(onSelected: (value) { if (value == 'logout') ref.read(authProvider.notifier).logout(); }, itemBuilder: (_) => [const PopupMenuItem(value: 'logout', child: Text('Log out'))])]),
       floatingActionButton: FloatingActionButton(onPressed: () async {
         final selected = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(builder: (_) => const EmployeePickerScreen()));
         if (selected != null && mounted) open((selected['id'] as num).toInt(), selected['name'].toString());
-      }, backgroundColor: const Color(0xFF25D366), foregroundColor: const Color(0xFF111B21), child: const Icon(Icons.add)),
+      }, backgroundColor: OrbitColors.primaryNavy, foregroundColor: Colors.white, child: const Icon(Icons.add)),
       body: Column(children: [
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: TextField(controller: search, onChanged: (_) => setState(() {}), decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Search', filled: true, fillColor: const Color(0xFFF0F2F5), contentPadding: const EdgeInsets.symmetric(vertical: 12), border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none)))),
-        Row(children: [const SizedBox(width: 16), ChoiceChip(label: const Text('All'), selected: !unread, selectedColor: const Color(0xFFD9FDD3), showCheckmark: false, onSelected: (_) => setState(() => unread = false)), const SizedBox(width: 8), ChoiceChip(label: const Text('Unread'), selected: unread, selectedColor: const Color(0xFFD9FDD3), showCheckmark: false, onSelected: (_) => setState(() => unread = true))]),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: TextField(controller: search, onChanged: (_) => setState(() {}), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search'))),
+        Row(children: [const SizedBox(width: 16), ChoiceChip(label: const Text('All'), selected: !unread, selectedColor: OrbitColors.bubbleBlue, showCheckmark: false, onSelected: (_) => setState(() => unread = false)), const SizedBox(width: 8), ChoiceChip(label: const Text('Unread'), selected: unread, selectedColor: OrbitColors.bubbleBlue, showCheckmark: false, onSelected: (_) => setState(() => unread = true))]),
         Expanded(child: loading ? const Center(child: CircularProgressIndicator()) : error != null ? Center(child: TextButton(onPressed: load, child: Text('$error Tap to retry.'))) : RefreshIndicator(onRefresh: load, child: filtered.isEmpty ? ListView(children: const [SizedBox(height: 100), Center(child: Text('No chats yet.'))]) : ListView.builder(itemCount: filtered.length, itemBuilder: (_, index) {
           final chat = filtered[index]; final count = (chat['unread_count'] as num? ?? 0).toInt();
-          return ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), leading: const CircleAvatar(radius: 25, backgroundColor: Color(0xFFDFE5E7), child: Icon(Icons.person, color: Colors.white)), title: Text(chat['name'].toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF111B21))), subtitle: Text((chat['latest_message'] ?? '').toString(), maxLines: 1, overflow: TextOverflow.ellipsis), trailing: count > 0 ? CircleAvatar(radius: 12, backgroundColor: const Color(0xFF25D366), child: Text('$count', style: const TextStyle(fontSize: 11, color: Color(0xFF111B21)))) : null, onTap: () => open((chat['id'] as num).toInt(), chat['name'].toString()));
+          return Card(child: ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), leading: const CircleAvatar(radius: 25, backgroundColor: OrbitColors.bubbleBlue, child: Icon(Icons.person, color: OrbitColors.primaryNavy)), title: Text(chat['name'].toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: OrbitColors.textNavy)), subtitle: Text((chat['latest_message'] ?? '').toString(), maxLines: 1, overflow: TextOverflow.ellipsis), trailing: count > 0 ? CircleAvatar(radius: 12, backgroundColor: OrbitColors.primaryNavy, child: Text('$count', style: const TextStyle(fontSize: 11, color: Colors.white))) : null, onTap: () => open((chat['id'] as num).toInt(), chat['name'].toString())));
         }))),
       ]),
     );
@@ -133,8 +134,11 @@ class _EmployeeMessagesScreenState extends ConsumerState<EmployeeMessagesScreen>
       if (snapshot.hasError) return Center(child: TextButton(onPressed: () => setState(() => messages = load()), child: const Text('Unable to load messages. Tap to retry.')));
       if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
       final items = snapshot.data!; final userId = ref.read(authProvider).user?.id;
-      return ListView.builder(itemCount: items.length, itemBuilder: (_, i) => Align(alignment: items[i]['sender_user_id'] == userId ? Alignment.centerRight : Alignment.centerLeft, child: Card(child: Padding(padding: const EdgeInsets.all(12), child: Text(items[i]['body'].toString())))));
+      return ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), itemCount: items.length, itemBuilder: (_, i) {
+        final mine = items[i]['sender_user_id'] == userId;
+        return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(margin: const EdgeInsets.symmetric(vertical: 4), constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .78), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: mine ? OrbitColors.bubbleBlue : OrbitColors.cardSurface, borderRadius: BorderRadius.only(topLeft: const Radius.circular(18), topRight: const Radius.circular(18), bottomLeft: Radius.circular(mine ? 18 : 5), bottomRight: Radius.circular(mine ? 5 : 18)), border: Border.all(color: OrbitColors.cardBorder)), child: Text(items[i]['body'].toString(), style: const TextStyle(color: OrbitColors.textPrimary))));
+      });
     })),
-    SafeArea(child: Row(children: [Expanded(child: TextField(controller: message, decoration: const InputDecoration(hintText: 'Message'))), IconButton(onPressed: sending ? null : send, icon: const Icon(Icons.send))])),
+    SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(12, 6, 12, 8), child: Row(children: [Expanded(child: TextField(controller: message, decoration: const InputDecoration(hintText: 'Write a message...', isDense: true))), const SizedBox(width: 8), IconButton.filled(onPressed: sending ? null : send, icon: const Icon(Icons.send))]))),
   ]));
 }

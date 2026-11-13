@@ -37,7 +37,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
   void _showQuickActionSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: OrbitColors.cardSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -168,7 +168,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: OrbitColors.cardSurface,
         title: const Text(
           'My Profile',
           style: TextStyle(color: OrbitColors.textNavy, fontWeight: FontWeight.bold),
@@ -299,7 +299,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
       margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
       height: 66,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: OrbitColors.cardSurface,
         borderRadius: BorderRadius.circular(32),
         border: Border.all(color: OrbitColors.cardBorder),
         boxShadow: const [
@@ -355,54 +355,67 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     final isSelected = _currentIndex == index;
     return InkWell(
       onTap: () => _onBottomNavTapped(index),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(999),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  icon,
-                  size: 22,
-                  color: isSelected ? OrbitColors.navActive : OrbitColors.navInactive,
-                ),
-                if (badgeCount != null)
-                  Positioned(
-                    top: -4,
-                    right: -10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: OrbitColors.accentCoral,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 14),
-                      child: Text(
-                        badgeCount > 99 ? '99+' : badgeCount.toString(),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFDFEAFF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    icon,
+                    size: 22,
+                    color: isSelected
+                        ? OrbitColors.navActive
+                        : OrbitColors.navInactive,
+                  ),
+                  if (badgeCount != null)
+                    Positioned(
+                      top: -4,
+                      right: -10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: OrbitColors.accentCoral,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        constraints:
+                            const BoxConstraints(minWidth: 16, minHeight: 14),
+                        child: Text(
+                          badgeCount > 99 ? '99+' : badgeCount.toString(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? OrbitColors.navActive : OrbitColors.navInactive,
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? OrbitColors.navActive
+                      : OrbitColors.navInactive,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

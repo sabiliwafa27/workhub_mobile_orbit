@@ -8,8 +8,8 @@ class ErpColors {
   static const Color lightBlue = Color(0xFFEFF6FF);
 
   // Background and Canvas
-  static const Color scaffoldBackground = Color(0xFFF8FAFC);
-  static const Color cardSurface = Colors.white;
+  static const Color scaffoldBackground = Color(0xFFEEF2FF);
+  static const Color cardSurface = Color(0xFFF9FAFF);
 
   // Text colors
   static const Color textPrimary = Color(0xFF0F172A);
@@ -17,8 +17,8 @@ class ErpColors {
   static const Color textMuted = Color(0xFF94A3B8);
 
   // Borders & Dividers
-  static const Color border = Color(0xFFE2E8F0);
-  static const Color divider = Color(0xFFF1F5F9);
+  static const Color border = Color(0xFFDCE4FA);
+  static const Color divider = Color(0xFFDCE4FA);
 
   // Status colors
   static const Color success = Color(0xFF10B981);

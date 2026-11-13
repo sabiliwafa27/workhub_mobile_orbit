@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/orbit_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 
 typedef _DetailKey = ({String stage, int id});
@@ -45,7 +46,23 @@ class LogisticOutDetailScreen extends ConsumerWidget {
               ? const SizedBox.shrink()
               : ListTile(contentPadding: EdgeInsets.zero, title: Text(label), subtitle: Text(value.toString()));
           return ListView(padding: const EdgeInsets.all(16), children: [
-            Text('Overview', style: Theme.of(context).textTheme.titleMedium),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: OrbitColors.cardSurface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: OrbitColors.cardBorder),
+              ),
+              child: Row(children: [
+                const CircleAvatar(radius: 26, backgroundColor: OrbitColors.bubbleBlue,
+                    child: Icon(Icons.local_shipping_outlined, color: OrbitColors.primaryNavy)),
+                const SizedBox(width: 14),
+                Expanded(child: Text('Logistic Out Overview',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800, color: OrbitColors.textNavy))),
+              ]),
+            ),
+            const SizedBox(height: 12),
             field('Status', _at(header, ['status_name']) ?? _at(trip, ['status_name'])),
             field('Purchase order', _at(header, ['display_reference'])),
             field('Requester', _at(header, ['requester', 'branch_name'])),

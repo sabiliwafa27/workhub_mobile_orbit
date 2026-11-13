@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/orbit_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'logistic_in_officer_form.dart';
 
@@ -55,7 +56,24 @@ class LogisticInDetailScreen extends ConsumerWidget {
               ? const SizedBox.shrink()
               : ListTile(contentPadding: EdgeInsets.zero, title: Text(label), subtitle: Text(value.toString()));
           return ListView(padding: const EdgeInsets.all(16), children: [
-            Text((selected['item_name'] ?? selected['description'] ?? 'Logistic In').toString(), style: Theme.of(context).textTheme.titleLarge),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: OrbitColors.cardSurface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: OrbitColors.cardBorder),
+              ),
+              child: Row(children: [
+                const CircleAvatar(radius: 26, backgroundColor: OrbitColors.bubbleBlue,
+                    child: Icon(Icons.inventory_2_outlined, color: OrbitColors.primaryNavy)),
+                const SizedBox(width: 14),
+                Expanded(child: Text(
+                  (selected['item_name'] ?? selected['description'] ?? 'Logistic In').toString(),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800, color: OrbitColors.textNavy),
+                )),
+              ]),
+            ),
             const SizedBox(height: 12),
             field('Arrival', selected['arrival_number']),
             field('Status', selected['line_status'] ?? selected['status']),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/theme/orbit_theme.dart';
 import '../../../core/realtime/reverb_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/inbox_provider.dart';
@@ -162,10 +163,38 @@ class _InboxDiscussionState extends ConsumerState<InboxDiscussion> {
       for (final item in [...olderComments, ...discussion.comments]) Builder(builder: (context) {
         final author = item['author'];
         final name = author is Map ? (author['name'] ?? '').toString() : '';
-        return Card(child: ListTile(title: Text(name.isEmpty ? 'User' : name), subtitle: Text((item['body'] ?? '').toString())));
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: OrbitColors.bubbleBlue,
+              child: Text(name.isEmpty ? 'U' : name.substring(0, 1).toUpperCase(), style: const TextStyle(color: OrbitColors.primaryNavy, fontWeight: FontWeight.w700)),
+            ),
+            title: Text(name.isEmpty ? 'User' : name, style: const TextStyle(fontWeight: FontWeight.w700, color: OrbitColors.textNavy)),
+            subtitle: Padding(padding: const EdgeInsets.only(top: 4), child: Text((item['body'] ?? '').toString())),
+          ),
+        );
       }),
       if (discussion.canComment) ...[
-        TextField(controller: comment, maxLength: 5000, maxLines: 3, enabled: !sending, decoration: const InputDecoration(labelText: 'Add a comment')),
+        const SizedBox(height: 10),
+        TextField(
+          controller: comment,
+          maxLength: 5000,
+          minLines: 2,
+          maxLines: 4,
+          enabled: !sending,
+          decoration: InputDecoration(
+            labelText: 'Write a comment...',
+            alignLabelWithHint: true,
+            prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
+            filled: true,
+            fillColor: OrbitColors.cardSurface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(24),
+              borderSide: const BorderSide(color: OrbitColors.cardBorder),
+            ),
+          ),
+        ),
         if (sendError != null) Text(sendError!, style: const TextStyle(color: Colors.red)),
         if (uncertain) ...[
           const Text('The comment may have been sent. Refresh the discussion before retrying.'),

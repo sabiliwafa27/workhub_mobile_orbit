@@ -53,7 +53,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: ErpColors.cardSurface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: ErpColors.border),
                 boxShadow: const [
@@ -181,7 +181,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: ErpColors.cardSurface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: ErpColors.border),
           boxShadow: const [

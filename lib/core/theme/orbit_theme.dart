@@ -8,17 +8,17 @@ class OrbitColors {
   static const Color brandOrangeLight = Color(0xFFF59E0B);
 
   // Background & Surfaces
-  static const Color scaffoldBackground = Color(0xFFF3F6FA);
-  static const Color cardSurface = Colors.white;
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color divider = Color(0xFFF1F5F9);
+  static const Color scaffoldBackground = Color(0xFFEEF2FF);
+  static const Color cardSurface = Color(0xFFF9FAFF);
+  static const Color cardBorder = Color(0xFFDCE4FA);
+  static const Color divider = Color(0xFFDCE4FA);
 
   // Status & Pills
   static const Color pillDark = Color(0xFF082247);
   static const Color creamCard = Color(0xFFFFFBEB);
   static const Color creamBorder = Color(0xFFFEF3C7);
-  static const Color bubbleBlue = Color(0xFFE0F2FE);
-  static const Color bubbleBlueBorder = Color(0xFFBAE6FD);
+  static const Color bubbleBlue = Color(0xFFDFEAFF);
+  static const Color bubbleBlueBorder = Color(0xFFC9D9FC);
 
   // Texts
   static const Color textNavy = Color(0xFF06244D);
@@ -55,7 +55,7 @@ class OrbitTheme {
       brightness: Brightness.light,
     );
     final controlShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(20),
     );
 
     return ThemeData(
@@ -92,25 +92,25 @@ class OrbitTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFFF7F9FC),
+        fillColor: const Color(0xFFF5F7FF),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         hintStyle: const TextStyle(color: OrbitColors.textMuted),
         labelStyle: const TextStyle(color: OrbitColors.textSecondary),
         floatingLabelStyle: const TextStyle(color: OrbitColors.primaryNavy),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(20),
           borderSide: const BorderSide(color: OrbitColors.cardBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(20),
           borderSide: const BorderSide(color: OrbitColors.cardBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(20),
           borderSide: const BorderSide(color: OrbitColors.primaryNavy, width: 1.6),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(20),
           borderSide: BorderSide(color: scheme.error),
         ),
         focusedErrorBorder: OutlineInputBorder(

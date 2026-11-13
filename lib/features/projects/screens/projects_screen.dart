@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/whatsapp_colors.dart';
+import '../../../core/theme/orbit_theme.dart';
 import '../providers/project_provider.dart';
 import '../../tasks/screens/create_work_item_screen.dart';
+import '../../tasks/screens/task_detail_screen.dart';
 
 class ProjectsScreen extends ConsumerStatefulWidget {
   const ProjectsScreen({super.key});
@@ -29,12 +31,12 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
           children: [
             // Header Banner
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 26,
-                    backgroundColor: const Color(0xFFEFF6FF),
+                    radius: 30,
+                    backgroundColor: WhatsAppColors.navIndicatorBg,
                     child: const Icon(
                       Icons.hub_outlined,
                       color: Color(0xFF1D4ED8),
@@ -49,7 +51,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                         Text(
                           'WorkHub Projects',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: WhatsAppColors.titleText,
                           ),
@@ -69,17 +71,17 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
               ),
             ),
 
-            const Divider(color: WhatsAppColors.divider, height: 24),
+            const SizedBox(height: 30),
 
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               child: Text(
                 'COMPANY INITIATIVES (${displayProjects.length})',
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                  color: WhatsAppColors.subtitleText,
+                  letterSpacing: 0.3,
+                  color: WhatsAppColors.primaryGreen,
                 ),
               ),
             ),
@@ -130,8 +132,8 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                 separatorBuilder: (_, __) => const Divider(
                   color: WhatsAppColors.divider,
                   height: 1,
-                  indent: 16,
-                  endIndent: 16,
+                  indent: 24,
+                  endIndent: 24,
                 ),
                 itemBuilder: (context, index) {
                   final project = displayProjects[index];
@@ -151,77 +153,106 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
 
   Widget _buildProjectCard(ProjectItemModel project) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  project.name,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: WhatsAppColors.titleText,
-                  ),
-                ),
-              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                width: 62,
+                height: 62,
                 decoration: BoxDecoration(
                   color: WhatsAppColors.navIndicatorBg,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(24),
                 ),
-                child: Text(
-                  '${project.progress}%',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: WhatsAppColors.darkGreen,
+                child: Icon(
+                  project.name.toLowerCase().contains('mom')
+                      ? Icons.layers_outlined
+                      : project.name.toLowerCase().contains('test')
+                          ? Icons.code_rounded
+                          : Icons.hub_outlined,
+                  color: WhatsAppColors.primaryGreen,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      project.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: WhatsAppColors.titleText,
+                      ),
+                    ),
+                    if (project.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        project.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: WhatsAppColors.subtitleText,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      const Icon(Icons.check_circle_outline,
+                          size: 18, color: WhatsAppColors.tealGreen),
+                      const SizedBox(width: 8),
+                      Flexible(child: Text('${project.completedTasks} completed',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13,
+                              color: WhatsAppColors.subtitleText))),
+                    ]),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      const Icon(Icons.pending_actions,
+                          size: 18, color: WhatsAppColors.iconMuted),
+                      const SizedBox(width: 8),
+                      Flexible(child: Text('${project.activeTasks} active',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13,
+                              color: WhatsAppColors.subtitleText))),
+                    ]),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: WhatsAppColors.navIndicatorBg,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text('${project.progress}%', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: WhatsAppColors.darkGreen)),
                   ),
-                ),
-              ),
-            ],
-          ),
-          if (project.description.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              project.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                color: WhatsAppColors.subtitleText,
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: project.progress / 100.0,
-              backgroundColor: WhatsAppColors.chipBorder,
-              valueColor: const AlwaysStoppedAnimation<Color>(WhatsAppColors.tealGreen),
-              minHeight: 6,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.check_circle_outline, size: 14, color: WhatsAppColors.tealGreen),
-              const SizedBox(width: 4),
-              Text(
-                '${project.completedTasks} completed',
-                style: const TextStyle(fontSize: 12, color: WhatsAppColors.subtitleText),
-              ),
-              const SizedBox(width: 14),
-              const Icon(Icons.pending_actions, size: 14, color: WhatsAppColors.iconMuted),
-              const SizedBox(width: 4),
-              Text(
-                '${project.activeTasks} active',
-                style: const TextStyle(fontSize: 12, color: WhatsAppColors.subtitleText),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: 86,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: project.progress.clamp(0, 100) / 100,
+                        backgroundColor: WhatsAppColors.chipBorder,
+                        valueColor: const AlwaysStoppedAnimation<Color>(WhatsAppColors.darkGreen),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -258,13 +289,96 @@ class ProjectTasksScreen extends ConsumerWidget {
         ),
         data: (items) => items.isEmpty
             ? const Center(child: Text('No tasks in this project.'))
-            : ListView.builder(
+            : Column(children: [
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: OrbitColors.cardSurface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: OrbitColors.cardBorder),
+                ),
+                child: Row(children: [
+                  const CircleAvatar(
+                    radius: 24,
+                    backgroundColor: OrbitColors.bubbleBlue,
+                    child: Icon(Icons.folder_outlined,
+                        color: OrbitColors.primaryNavy),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(project.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: OrbitColors.textNavy)),
+                      Text('${items.length} tasks in this project',
+                          style: const TextStyle(
+                              color: OrbitColors.textSecondary)),
+                    ],
+                  )),
+                ]),
+              ),
+              Expanded(child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final task = items[index];
-                  return ListTile(title: Text(task.title), subtitle: Text(task.status));
+                  final complete = task.progressPercent >= 100;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => TaskDetailScreen(taskId: task.id))),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: complete ? OrbitColors.primaryNavy : Colors.transparent,
+                              border: Border.all(color: complete
+                                  ? OrbitColors.primaryNavy : OrbitColors.textMuted),
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            child: complete
+                                ? const Icon(Icons.check, size: 20, color: Colors.white)
+                                : null,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(task.title, style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: OrbitColors.textNavy,
+                                decoration: complete ? TextDecoration.lineThrough : null,
+                              )),
+                              const SizedBox(height: 4),
+                              Text(task.status.replaceAll('_', ' '),
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: OrbitColors.textSecondary)),
+                            ],
+                          )),
+                          const SizedBox(width: 8),
+                          Text('${task.progressPercent}%',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: OrbitColors.primaryNavy)),
+                        ]),
+                      ),
+                    ),
+                  );
                 },
-              ),
+              )),
+            ]),
       ),
     );
   }

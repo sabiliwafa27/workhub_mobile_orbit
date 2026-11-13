@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/theme/orbit_theme.dart';
 
 DateTime standardTaskDueDate(DateTime now) => DateTime(now.year, now.month, now.day + 2);
 
@@ -749,6 +750,38 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
     child: Scaffold(
     appBar: AppBar(title: Text(widget.isEc ? 'Create EC' : 'Create task')),
     body: !widget.isEc && quickMode ? buildQuickTaskForm() : ListView(padding: const EdgeInsets.all(16), children: [
+      Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: OrbitColors.cardSurface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: OrbitColors.cardBorder),
+        ),
+        child: Row(children: [
+          const CircleAvatar(
+            radius: 24,
+            backgroundColor: OrbitColors.bubbleBlue,
+            child: Icon(Icons.add_task_rounded, color: OrbitColors.primaryNavy),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.isEc ? 'New EC idea' : 'New task',
+                  style: const TextStyle(fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: OrbitColors.textNavy)),
+              const SizedBox(height: 3),
+              Text(widget.isEc
+                  ? 'Share an idea for today.'
+                  : 'Capture the work and assign it to your team.',
+                  style: const TextStyle(
+                      color: OrbitColors.textSecondary)),
+            ],
+          )),
+        ]),
+      ),
+      const SizedBox(height: 16),
       if (!widget.isEc) Align(alignment: Alignment.centerRight, child: TextButton(
         onPressed: saving || generating || taskSubmissionUncertain ? null : () => setState(() {
           standardDescription = description.text;

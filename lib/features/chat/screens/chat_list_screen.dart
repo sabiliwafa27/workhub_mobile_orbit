@@ -62,7 +62,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 height: 46,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: OrbitColors.cardSurface,
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(color: OrbitColors.cardBorder),
                 ),
@@ -119,7 +119,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isSelected ? OrbitColors.pillDark : Colors.white,
+                        color: isSelected ? OrbitColors.pillDark : OrbitColors.cardSurface,
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
                           color: isSelected ? OrbitColors.pillDark : OrbitColors.cardBorder,
@@ -189,7 +189,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: OrbitColors.cardSurface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: OrbitColors.cardBorder),
         boxShadow: const [

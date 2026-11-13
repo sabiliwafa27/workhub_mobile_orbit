@@ -440,7 +440,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                   icon: const Icon(Icons.notifications_none_rounded,
                       color: OrbitColors.textPrimary, size: 24),
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
+                    backgroundColor: OrbitColors.cardSurface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                       side: const BorderSide(color: OrbitColors.cardBorder),
@@ -467,7 +467,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
               icon: const Icon(Icons.dashboard_customize_outlined,
                   color: OrbitColors.textPrimary, size: 22),
               style: IconButton.styleFrom(
-                backgroundColor: Colors.white,
+                backgroundColor: OrbitColors.cardSurface,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: const BorderSide(color: OrbitColors.cardBorder),
@@ -577,7 +577,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             height: 46,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: OrbitColors.cardSurface,
               borderRadius: BorderRadius.circular(999),
               border: Border.all(color: OrbitColors.cardBorder),
               boxShadow: const [
@@ -618,7 +618,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           width: 46,
           height: 46,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: OrbitColors.cardSurface,
             shape: BoxShape.circle,
             border: Border.all(color: OrbitColors.cardBorder),
             boxShadow: const [
@@ -1029,7 +1029,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: OrbitColors.cardSurface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: OrbitColors.cardBorder),
             ),
@@ -1242,7 +1242,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: OrbitColors.cardSurface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: OrbitColors.cardBorder),
             ),
@@ -1300,7 +1300,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
               return Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: OrbitColors.cardSurface,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: OrbitColors.cardBorder),
                   boxShadow: const [
@@ -1442,7 +1442,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: isSelected ? OrbitColors.pillDark : Colors.white,
+                      color: isSelected ? OrbitColors.pillDark : OrbitColors.cardSurface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: isSelected
@@ -1519,7 +1519,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: OrbitColors.cardSurface,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: OrbitColors.cardBorder),
               ),

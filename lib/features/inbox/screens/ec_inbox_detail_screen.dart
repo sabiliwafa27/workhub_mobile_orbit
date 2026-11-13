@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/theme/orbit_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../tasks/providers/ec_progress_provider.dart';
 import '../providers/inbox_provider.dart';
@@ -104,7 +105,26 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
         final current = detail['current_progress'];
         final progress = current is Map ? (current['percentage'] as num? ?? 0).toDouble() : 0.0;
         return ListView(padding: const EdgeInsets.all(16), children: [
-          Text((detail['title'] ?? '').toString(), style: Theme.of(context).textTheme.titleLarge),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: OrbitColors.cardSurface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: OrbitColors.cardBorder),
+            ),
+            child: Row(children: [
+              const CircleAvatar(
+                radius: 25,
+                backgroundColor: OrbitColors.bubbleBlue,
+                child: Icon(Icons.layers_outlined, color: OrbitColors.primaryNavy),
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: Text((detail['title'] ?? '').toString(),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800, color: OrbitColors.textNavy))),
+            ]),
+          ),
           const SizedBox(height: 12),
           Text('Owner: ${detail['employee_name'] ?? '—'}'),
           Text('EC date: ${detail['date'] ?? '—'}'),
@@ -121,7 +141,14 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
           if (history.isEmpty) const Text('No progress updates yet.'),
           for (final entry in history) ListTile(contentPadding: EdgeInsets.zero, title: Text('${entry['percentage']}% · ${entry['employee_name'] ?? ''}'), subtitle: Text('${entry['note'] ?? ''}\n${entry['at'] ?? ''}')),
           const Divider(height: 32),
-          Text('Discussion', style: Theme.of(context).textTheme.titleMedium),
+          Row(children: [
+            const CircleAvatar(radius: 19, backgroundColor: OrbitColors.bubbleBlue,
+                child: Icon(Icons.chat_bubble_outline_rounded,
+                    color: OrbitColors.primaryNavy, size: 19)),
+            const SizedBox(width: 10),
+            Text('Discussion', style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800, color: OrbitColors.textNavy)),
+          ]),
           const SizedBox(height: 8),
           InboxDiscussion(module: 'workhub_ec', subjectKey: widget.entryId),
         ]);
