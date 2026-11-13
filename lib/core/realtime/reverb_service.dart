@@ -137,8 +137,6 @@ class ReverbRealtimeService {
     listeners.add(onEvent);
     if (_isConnected) {
       unawaited(_subscribeToChannel(channelName));
-    } else {
-      unawaited(connect());
     }
 
     return () {
