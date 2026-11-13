@@ -14,6 +14,9 @@ class TaskItemModel {
   final String? projectName;
   final String? rowAction;
   final bool hasPendingReview;
+  final bool priorityEligible;
+  final bool isPersonalPriority;
+  final int attachmentCount;
   final List<String> assignees;
 
   TaskItemModel({
@@ -27,6 +30,9 @@ class TaskItemModel {
     this.projectName,
     this.rowAction,
     this.hasPendingReview = false,
+    this.priorityEligible = false,
+    this.isPersonalPriority = false,
+    this.attachmentCount = 0,
     this.assignees = const [],
   });
 
@@ -34,19 +40,25 @@ class TaskItemModel {
     return TaskItemModel(
       id: json['task_id'] as int? ?? json['id'] as int? ?? 0,
       title: json['title'] as String? ?? json['subject'] as String? ?? 'Task',
-      description: json['description'] as String? ?? json['detail'] as String? ?? '',
+      description:
+          json['description'] as String? ?? json['detail'] as String? ?? '',
       status: json['status'] as String? ?? 'in_progress',
-      progressPercent: json['progress_percent'] as int? ?? json['progress'] as int? ?? 0,
-      dueDate: json['due_date'] as String? ?? json['created_at'] as String? ?? '',
+      progressPercent:
+          json['progress_percent'] as int? ?? json['progress'] as int? ?? 0,
+      dueDate: json['due_date'] as String? ?? '',
       priority: json['priority'] as String? ?? 'medium',
       projectName: json['project_name'] as String?,
       rowAction: json['row_action'] as String?,
       hasPendingReview: json['has_pending_review'] == true,
-      assignees: (json['assignees'] is List ? json['assignees'] as List : const [])
-          .whereType<Map>()
-          .map((person) => (person['full_name'] ?? '').toString())
-          .where((name) => name.isNotEmpty)
-          .toList(),
+      priorityEligible: json['personal_priority_eligible'] == true,
+      isPersonalPriority: json['personal_priority_position'] != null,
+      attachmentCount: (json['attachment_count'] as num?)?.toInt() ?? 0,
+      assignees:
+          (json['assignees'] is List ? json['assignees'] as List : const [])
+              .whereType<Map>()
+              .map((person) => (person['full_name'] ?? '').toString())
+              .where((name) => name.isNotEmpty)
+              .toList(),
     );
   }
 }
@@ -61,22 +73,43 @@ class TaskRepository {
 
   TaskRepository(this._apiClient);
 
-  Future<TaskPage> fetchTasks({String status = 'all', int page = 1}) async {
+  Future<TaskPage> fetchTasks(
+      {String status = 'all',
+      String search = '',
+      String priority = '',
+      String? from,
+      String? to,
+      int page = 1}) async {
     try {
       final response = await _apiClient.dio.get('/tasks', queryParameters: {
         'status': status,
+        'search': search,
+        if (priority.isNotEmpty) 'priority': priority,
+        if (from != null) 'from': from,
+        if (to != null) 'to': to,
         'page': page,
         'per_page': 25,
       });
       if (response.data is Map) {
-        final raw = response.data['data'] ?? response.data['tasks'] ?? response.data['incomplete'];
+        final raw = response.data['data'] ??
+            response.data['tasks'] ??
+            response.data['incomplete'];
         if (raw is List) {
           final meta = response.data['meta'];
           return TaskPage(
-            tasks: raw.map((json) => TaskItemModel.fromJson(json as Map<String, dynamic>)).toList(),
-            page: meta is Map ? (meta['current_page'] as num? ?? page).toInt() : page,
-            lastPage: meta is Map ? (meta['last_page'] as num? ?? page).toInt() : page,
-            total: meta is Map ? (meta['total'] as num? ?? raw.length).toInt() : raw.length,
+            tasks: raw
+                .map((json) =>
+                    TaskItemModel.fromJson(json as Map<String, dynamic>))
+                .toList(),
+            page: meta is Map
+                ? (meta['current_page'] as num? ?? page).toInt()
+                : page,
+            lastPage: meta is Map
+                ? (meta['last_page'] as num? ?? page).toInt()
+                : page,
+            total: meta is Map
+                ? (meta['total'] as num? ?? raw.length).toInt()
+                : raw.length,
           );
         }
       }
@@ -97,6 +130,18 @@ class TaskRepository {
       return null;
     }
   }
+
+  Future<Map<String, dynamic>> fetchPriorities() async {
+    final response = await _apiClient.dio.get('/tasks/priorities');
+    if (response.data is! Map)
+      throw const FormatException('Unexpected priority response');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<void> addPriority(int taskId) async =>
+      _apiClient.dio.post('/tasks/priorities/$taskId');
+  Future<void> removePriority(int taskId) async =>
+      _apiClient.dio.delete('/tasks/priorities/$taskId');
 
   Future<bool> completeTask(int taskId) async {
     try {
@@ -125,7 +170,11 @@ class TaskPage {
   final int page;
   final int lastPage;
   final int total;
-  TaskPage({required this.tasks, required this.page, required this.lastPage, required this.total});
+  TaskPage(
+      {required this.tasks,
+      required this.page,
+      required this.lastPage,
+      required this.total});
 }
 
 class TaskListState {
@@ -178,20 +227,44 @@ class TaskNotifier extends StateNotifier<TaskListState> {
   final int? _userId;
   int _generation = 0;
   String _status = 'all';
+  String _search = '';
+  String _priority = '';
+  String? _from;
+  String? _to;
 
-  TaskNotifier(this._repo, this._reverb, this._userId) : super(TaskListState()) {
+  TaskNotifier(this._repo, this._reverb, this._userId)
+      : super(TaskListState()) {
     loadTasks();
     _setupRealtime();
   }
 
-  Future<void> loadTasks({String? status}) async {
+  Future<void> loadTasks(
+      {String? status,
+      String? search,
+      String? priority,
+      String? from,
+      String? to}) async {
     _status = status ?? _status;
+    _search = search ?? _search;
+    _priority = priority ?? _priority;
+    _from = from ?? _from;
+    _to = to ?? _to;
     final generation = ++_generation;
     state = state.copyWith(isLoading: true, isLoadingMore: false, error: null);
     try {
-      final page = await _repo.fetchTasks(status: _status);
+      final page = await _repo.fetchTasks(
+          status: _status,
+          search: _search,
+          priority: _priority,
+          from: _from,
+          to: _to);
       if (!mounted || generation != _generation) return;
-      state = state.copyWith(tasks: page.tasks, page: page.page, lastPage: page.lastPage, total: page.total, isLoading: false);
+      state = state.copyWith(
+          tasks: page.tasks,
+          page: page.page,
+          lastPage: page.lastPage,
+          total: page.total,
+          isLoading: false);
     } catch (e) {
       if (!mounted || generation != _generation) return;
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -199,14 +272,29 @@ class TaskNotifier extends StateNotifier<TaskListState> {
   }
 
   Future<void> loadMore() async {
-    if (state.isLoading || state.isLoadingMore || state.page >= state.lastPage) return;
+    if (state.isLoading || state.isLoadingMore || state.page >= state.lastPage)
+      return;
     final generation = _generation;
     state = state.copyWith(isLoadingMore: true);
     try {
-      final page = await _repo.fetchTasks(status: _status, page: state.page + 1);
+      final page = await _repo.fetchTasks(
+          status: _status,
+          search: _search,
+          priority: _priority,
+          from: _from,
+          to: _to,
+          page: state.page + 1);
       if (!mounted || generation != _generation) return;
       final existing = state.tasks.map((task) => task.id).toSet();
-      state = state.copyWith(tasks: [...state.tasks, ...page.tasks.where((task) => !existing.contains(task.id))], page: page.page, lastPage: page.lastPage, total: page.total, isLoadingMore: false);
+      state = state.copyWith(
+          tasks: [
+            ...state.tasks,
+            ...page.tasks.where((task) => !existing.contains(task.id))
+          ],
+          page: page.page,
+          lastPage: page.lastPage,
+          total: page.total,
+          isLoadingMore: false);
     } catch (e) {
       if (!mounted || generation != _generation) return;
       state = state.copyWith(isLoadingMore: false, loadMoreError: e.toString());
@@ -231,7 +319,8 @@ class TaskNotifier extends StateNotifier<TaskListState> {
   }
 }
 
-final taskNotifierProvider = StateNotifierProvider<TaskNotifier, TaskListState>((ref) {
+final taskNotifierProvider =
+    StateNotifierProvider<TaskNotifier, TaskListState>((ref) {
   final repo = ref.watch(taskRepositoryProvider);
   final reverb = ref.watch(reverbServiceProvider);
   final user = ref.watch(authProvider).user;
