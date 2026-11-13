@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
@@ -14,11 +13,13 @@ class _Storage extends SecureStorageService {
 }
 
 void main() {
-  testWidgets('WorkHub starts at login when there is no authenticated user', (tester) async {
+  testWidgets('WorkHub starts at login when there is no authenticated user',
+      (tester) async {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         storageServiceProvider.overrideWithValue(_Storage()),
-        apiClientProvider.overrideWithValue(ApiClient(customDio: Dio(), customStorage: _Storage())),
+        apiClientProvider.overrideWithValue(
+            ApiClient(customDio: Dio(), customStorage: _Storage())),
       ],
       child: const WorkHubApp(),
     ));

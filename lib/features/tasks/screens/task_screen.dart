@@ -1,20 +1,33 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/widgets/orbit_workspace.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/task_provider.dart';
 import 'create_work_item_screen.dart';
 import 'task_detail_screen.dart';
+import '../widgets/task_board_row.dart';
+import '../../inbox/screens/inbox_screen.dart';
+import '../../inbox/providers/inbox_provider.dart';
+
+enum TaskBoardPeriod { today, week, month, overdue, all }
 
 class TaskScreen extends ConsumerStatefulWidget {
-  const TaskScreen({super.key});
+  final VoidCallback? onOpenNotifications, onOpenProfile;
+  const TaskScreen({super.key, this.onOpenNotifications, this.onOpenProfile});
 
   @override
   ConsumerState<TaskScreen> createState() => _TaskScreenState();
 }
 
 class _TaskScreenState extends ConsumerState<TaskScreen> {
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+  final _scrollController = ScrollController();
+  final _busyTasks = <int>{};
+  bool _showFilters = false;
+  TaskBoardPeriod _period = TaskBoardPeriod.today;
   String _status = 'all';
   String _priority = '';
   DateTimeRange? _dateRange;
@@ -29,9 +42,20 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     super.initState();
     _priorityFuture = ref.read(taskRepositoryProvider).fetchPriorities();
     _ideasFuture = _loadIdeas('');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _selectPeriod(TaskBoardPeriod.today);
+    });
   }
 
-  Future<Map<String, dynamic>> _loadIdeas(String search) async {
+  Future<Map<String, dynamic>> _loadIdeas(String search) {
+    final future = _fetchIdeas(search);
+    // The permission-dependent panel may not be mounted when a request fails.
+    // Keep the original future so FutureBuilder can still present its retry UI.
+    future.ignore();
+    return future;
+  }
+
+  Future<Map<String, dynamic>> _fetchIdeas(String search) async {
     final response = await ref
         .read(apiClientProvider)
         .dio
@@ -48,522 +72,636 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   void dispose() {
     _searchTimer?.cancel();
     _ideasTimer?.cancel();
+    _searchController.dispose();
+    _searchFocus.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  String _group(TaskItemModel task) {
-    final due = DateTime.tryParse(task.dueDate);
-    if (due == null) return 'No Due Date';
+  Future<void> _selectPeriod(TaskBoardPeriod period) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(due.year, due.month, due.day);
-    if (day.isBefore(today)) {
-      return const ['completed', 'cancelled']
-              .contains(task.status.toLowerCase())
-          ? 'Past Dates'
-          : 'Overdue';
+    DateTime? start, end;
+    if (period == TaskBoardPeriod.today) {
+      start = today;
+      end = today;
     }
-    return day == today ? 'Today' : 'Upcoming';
+    if (period == TaskBoardPeriod.week) {
+      start = today.subtract(Duration(days: today.weekday - 1));
+      end = start.add(const Duration(days: 6));
+    }
+    if (period == TaskBoardPeriod.month) {
+      start = DateTime(now.year, now.month);
+      end = DateTime(now.year, now.month + 1, 0);
+    }
+    setState(() {
+      _period = period;
+      _status = period == TaskBoardPeriod.overdue ? 'overdue' : 'all';
+      _dateRange =
+          start == null ? null : DateTimeRange(start: start, end: end!);
+    });
+    String date(DateTime d) => d.toIso8601String().split('T').first;
+    await ref.read(taskNotifierProvider.notifier).loadTasks(
+        status: _status,
+        search: _searchController.text.trim(),
+        priority: _priority,
+        from: start == null ? null : date(start),
+        to: end == null ? null : date(end),
+        clearDateRange: start == null);
   }
+
+  Future<void> _focusSearch() async {
+    if (_scrollController.hasClients) {
+      await _scrollController.animateTo(0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic);
+    }
+    if (mounted) _searchFocus.requestFocus();
+  }
+
+  Future<void> _taskAction(TaskItemModel task) async {
+    if (_busyTasks.contains(task.id)) return;
+    setState(() => _busyTasks.add(task.id));
+    try {
+      final repository = ref.read(taskRepositoryProvider);
+      final review = task.rowAction == 'request_review';
+      final success = review
+          ? await repository.requestReview(task.id)
+          : await repository.completeTask(task.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(success
+              ? review
+                  ? 'Review requested.'
+                  : 'Task completed.'
+              : review
+                  ? 'Could not request review. Refresh and try again.'
+                  : 'Could not complete task. Refresh and try again.')));
+      if (success) ref.read(taskNotifierProvider.notifier).loadTasks();
+    } finally {
+      if (mounted) setState(() => _busyTasks.remove(task.id));
+    }
+  }
+
+  Future<void> _addPriority(TaskItemModel task) async {
+    if (_busyTasks.contains(task.id)) return;
+    setState(() => _busyTasks.add(task.id));
+    try {
+      await ref.read(taskRepositoryProvider).addPriority(task.id);
+      if (!mounted) return;
+      _reloadPriorities();
+      ref.read(taskNotifierProvider.notifier).loadTasks();
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Unable to add priority. Please try again.')));
+    } finally {
+      if (mounted) setState(() => _busyTasks.remove(task.id));
+    }
+  }
+
+  void _profile() {
+    if (widget.onOpenProfile != null) {
+      widget.onOpenProfile!();
+      return;
+    }
+    final user = ref.read(authProvider).user;
+    showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: Text(user?.name ?? 'My profile'),
+                content: Text(user?.email ?? ''),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'))
+                ]));
+  }
+
+  Widget _headerAction(IconData icon, String label, VoidCallback action,
+          {bool badge = false}) =>
+      IconButton(
+          tooltip: label,
+          onPressed: action,
+          padding: const EdgeInsets.all(3),
+          constraints: const BoxConstraints(minWidth: 34, minHeight: 40),
+          icon: Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: .08),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: .3))),
+              child: Badge(
+                  isLabelVisible: badge,
+                  backgroundColor: OrbitColors.kpiRed,
+                  child: Center(
+                      child: Icon(icon, color: Colors.white, size: 19)))));
 
   @override
   Widget build(BuildContext context) {
     final taskState = ref.watch(taskNotifierProvider);
-    final canManageEc =
-        ref.watch(authProvider).user?.can('task.ec.manage') == true;
-    final displayTasks = taskState.tasks;
-    final activeCount = displayTasks.where((task) => task.progressPercent < 100 && task.status != 'cancelled').length;
-
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.large(
-        tooltip: 'Create task',
-        onPressed: () async {
-          final created = await Navigator.of(context).push<bool>(
-              MaterialPageRoute(builder: (_) => const CreateWorkItemScreen()));
-          if (created == true && context.mounted)
-            ref.read(taskNotifierProvider.notifier).loadTasks();
-        },
-        child: const Icon(Icons.add),
-      ),
-      backgroundColor: Colors.transparent,
+    final user = ref.watch(authProvider).user;
+    final canManageEc = user?.can('task.ec.manage') == true;
+    final showAll = _period == TaskBoardPeriod.all || _status != 'all';
+    final tasks = showAll
+        ? taskState.tasks
+        : taskState.tasks
+            .where((task) =>
+                task.status != 'completed' && task.status != 'cancelled')
+            .toList();
+    final unread =
+        ref.watch(inboxNotifierProvider).items.any((item) => item.isUnread);
+    final photo = user?.profilePhotoUrl;
+    return OrbitWorkspaceScaffold(
+      subtitle: 'Your priorities, progress & assignments',
+      floatingActionButtonColor: OrbitColors.royalBlue,
       appBar: AppBar(
-        leadingWidth: 64,
-        leading: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 5, 0, 5),
-          child: DecoratedBox(
-            decoration: BoxDecoration(color: OrbitColors.primaryNavy,
-                borderRadius: BorderRadius.circular(16)),
-            child: const Icon(Icons.assignment_turned_in_outlined, color: Colors.white),
-          ),
+          leadingWidth: 42,
+          leading: const Icon(Icons.assignment_turned_in_outlined,
+              color: Colors.white, size: 27),
+          title: const Text('Task Board'),
+          actions: [
+            _headerAction(Icons.search_rounded, 'Search tasks', _focusSearch),
+            _headerAction(
+                Icons.notifications_none_rounded,
+                'Task notifications',
+                widget.onOpenNotifications ??
+                    () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const InboxScreen())),
+                badge: unread),
+            IconButton(
+                tooltip: 'My profile',
+                onPressed: _profile,
+                padding: const EdgeInsets.fromLTRB(4, 0, 10, 0),
+                constraints: const BoxConstraints(minWidth: 38, minHeight: 40),
+                icon: CircleAvatar(
+                    radius: 17,
+                    backgroundColor: Colors.white,
+                    child: ClipOval(
+                        child: photo == null || photo.isEmpty
+                            ? Text(
+                                user?.name.isNotEmpty == true
+                                    ? user!.name[0].toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                    color: OrbitColors.primaryNavy,
+                                    fontSize: 13))
+                            : Image.network(photo,
+                                width: 32,
+                                height: 32,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.person_outline,
+                                    color: OrbitColors.primaryNavy)))))
+          ]),
+      floatingActionButton: Container(
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x4D2563EB),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
-        title: const Text('Task Board'),
-        actions: [
-          IconButton(
-            icon:
-                const Icon(Icons.refresh_rounded, color: OrbitColors.textNavy),
-            onPressed: () {
-              ref.read(taskNotifierProvider.notifier).loadTasks();
+        child: FloatingActionButton(
+            heroTag: 'task-board-fab',
+            tooltip: 'Create task',
+            shape: const CircleBorder(),
+            backgroundColor: OrbitColors.royalBlue,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            onPressed: () async {
+              final created = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                      builder: (_) => const CreateWorkItemScreen()));
+              if (created == true && mounted)
+                ref.read(taskNotifierProvider.notifier).loadTasks();
             },
-          ),
-        ],
+            child: const Icon(Icons.add, size: 34)),
       ),
       body: RefreshIndicator(
-        color: OrbitColors.primaryNavy,
-        onRefresh: () async {
-          await ref.read(taskNotifierProvider.notifier).loadTasks();
-        },
-        child: ListView(
-          padding:
-              const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 90),
-          children: [
-            // Status Header Info
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: OrbitColors.cardSurface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: OrbitColors.cardBorder),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: OrbitColors.bubbleBlue,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.assignment_outlined,
-                      color: OrbitColors.primaryNavy,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
+          onRefresh: () => ref.read(taskNotifierProvider.notifier).loadTasks(),
+          child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+              children: [
+                Row(children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Active Assigned Tasks',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: OrbitColors.textNavy,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$activeCount task${activeCount == 1 ? '' : 's'} in progress',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: OrbitColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: const Text('Search, filters & priorities'),
-              children: [
-            const Text('Priority',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: OrbitColors.textNavy)),
-            const SizedBox(height: 6),
-            FutureBuilder<Map<String, dynamic>>(
-              future: _priorityFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  return const LinearProgressIndicator();
-                if (snapshot.hasError)
-                  return TextButton(
-                      onPressed: _reloadPriorities,
-                      child: const Text('Priority is unavailable. Retry'));
-                final payload = snapshot.data ?? const <String, dynamic>{};
-                final rows = payload['data'] is List
-                    ? payload['data'] as List
-                    : const [];
-                final meta = payload['meta'];
-                return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (rows.isEmpty)
-                        const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text('No priority tasks yet.')),
-                      for (final row in rows.whereType<Map>())
-                        ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text((row['title'] ?? 'Task').toString(),
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
-                          trailing: IconButton(
-                              tooltip: 'Remove from Priority',
-                              icon: const Icon(Icons.remove_circle_outline),
-                              onPressed: () async {
-                                await ref
-                                    .read(taskRepositoryProvider)
-                                    .removePriority(
-                                        (row['task_id'] as num).toInt());
-                                _reloadPriorities();
-                                ref
-                                    .read(taskNotifierProvider.notifier)
-                                    .loadTasks();
-                              }),
-                          onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) => TaskDetailScreen(
-                                      taskId:
-                                          (row['task_id'] as num).toInt()))),
-                        ),
-                      if (meta is Map && (meta['last_page'] as num? ?? 1) > 1)
-                        const Text('Showing your saved priority tasks'),
-                    ]);
-              },
-            ),
-            const Divider(height: 24),
-            if (canManageEc) ...[
-              const Text('EC Today Ideas',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: OrbitColors.textNavy)),
-              TextField(
-                decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.lightbulb_outline),
-                    hintText: 'Search today ideas',
-                    isDense: true),
-                onChanged: (value) {
-                  _ideasSearch = value.trim();
-                  _ideasTimer?.cancel();
-                  _ideasTimer = Timer(const Duration(milliseconds: 350), () {
-                    if (mounted)
-                      setState(() => _ideasFuture = _loadIdeas(_ideasSearch));
-                  });
-                },
-              ),
-              FutureBuilder<Map<String, dynamic>>(
-                future: _ideasFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting)
-                    return const LinearProgressIndicator();
-                  if (snapshot.hasError)
-                    return TextButton(
-                        onPressed: () => setState(
-                            () => _ideasFuture = _loadIdeas(_ideasSearch)),
-                        child: const Text('Unable to load EC ideas. Retry'));
-                  final data = snapshot.data ?? const <String, dynamic>{};
-                  final ideas =
-                      data['data'] is List ? data['data'] as List : const [];
-                  return Column(children: [
-                    if (ideas.isEmpty)
-                      const ListTile(title: Text('No EC ideas for today')),
-                    for (final idea in ideas.whereType<Map>())
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.lightbulb_outline),
-                        title: Text((idea['title'] ?? idea['idea'] ?? 'EC idea')
-                            .toString()),
-                        subtitle: Text(
-                            (idea['status_name'] ?? idea['status'] ?? '')
-                                .toString()),
-                      ),
-                  ]);
-                },
-              ),
-              const Divider(height: 24),
-            ],
-            TextField(
-              decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Search tasks',
-                  isDense: true),
-              onChanged: (value) {
-                _searchTimer?.cancel();
-                _searchTimer = Timer(const Duration(milliseconds: 350), () {
-                  if (mounted)
-                    ref
-                        .read(taskNotifierProvider.notifier)
-                        .loadTasks(search: value.trim());
-                });
-              },
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _status,
-              decoration:
-                  const InputDecoration(labelText: 'Status', isDense: true),
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('All statuses')),
-                DropdownMenuItem(value: 'open', child: Text('Open')),
-                DropdownMenuItem(
-                    value: 'in_progress', child: Text('In progress')),
-                DropdownMenuItem(
-                    value: 'pending_review', child: Text('Pending review')),
-                DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
-                DropdownMenuItem(value: 'overdue', child: Text('Overdue')),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() => _status = value);
-                ref
-                    .read(taskNotifierProvider.notifier)
-                    .loadTasks(status: value);
-              },
-            ),
-            DropdownButtonFormField<String>(
-              value: _priority,
-              decoration:
-                  const InputDecoration(labelText: 'Priority', isDense: true),
-              items: const [
-                DropdownMenuItem(value: '', child: Text('Any priority')),
-                DropdownMenuItem(value: 'low', child: Text('Low')),
-                DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                DropdownMenuItem(value: 'urgent', child: Text('Urgent'))
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() => _priority = value);
-                ref
-                    .read(taskNotifierProvider.notifier)
-                    .loadTasks(priority: value);
-              },
-            ),
-            TextButton.icon(
-              icon: const Icon(Icons.date_range),
-              label: Text(_dateRange == null
-                  ? 'Filter by due date'
-                  : '${_dateRange!.start.toIso8601String().substring(0, 10)} – ${_dateRange!.end.toIso8601String().substring(0, 10)}'),
-              onPressed: () async {
-                final picked = await showDateRangePicker(
-                    context: context,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100),
-                    initialDateRange: _dateRange);
-                if (picked == null || !mounted) return;
-                setState(() => _dateRange = picked);
-                ref.read(taskNotifierProvider.notifier).loadTasks(
-                    from: picked.start.toIso8601String().substring(0, 10),
-                    to: picked.end.toIso8601String().substring(0, 10));
-              },
-            ),
-            const SizedBox(height: 12),
-              ],
-            ),
-            // Tasks List
-            if (taskState.isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 40),
-                  child:
-                      CircularProgressIndicator(color: OrbitColors.primaryNavy),
-                ),
-              )
-            else if (taskState.error != null)
-              Center(
-                child: TextButton(
-                  onPressed: () =>
-                      ref.read(taskNotifierProvider.notifier).loadTasks(),
-                  child: const Text('Unable to load tasks. Tap to retry.'),
-                ),
-              )
-            else if (displayTasks.isEmpty)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-                decoration: BoxDecoration(
-                  color: OrbitColors.cardSurface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: OrbitColors.cardBorder),
-                ),
-                child: Column(
-                  children: const [
-                    Icon(Icons.task_alt_rounded,
-                        size: 48, color: OrbitColors.textMuted),
-                    SizedBox(height: 12),
-                    Text(
-                      'No tasks assigned',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: OrbitColors.textNavy,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'All your tasks will be listed here when assigned.',
-                      style: TextStyle(
-                          fontSize: 12, color: OrbitColors.textSecondary),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              )
-            else
-              for (final group in [
-                'Overdue',
-                'Past Dates',
-                'Today',
-                'Upcoming',
-                'No Due Date'
-              ]) ...[
-                if (displayTasks.any((task) => _group(task) == group)) ...[
-                  Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(group,
-                          style: const TextStyle(fontWeight: FontWeight.bold))),
-                  for (final task
-                      in displayTasks.where((task) => _group(task) == group))
-                    Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildTaskCard(task)),
-                ],
-              ],
-            if (taskState.page < taskState.lastPage && taskState.error == null)
-              Center(
-                  child: TextButton(
-                onPressed: taskState.isLoadingMore
-                    ? null
-                    : () => ref.read(taskNotifierProvider.notifier).loadMore(),
-                child: Text(taskState.isLoadingMore
-                    ? 'Loading…'
-                    : taskState.loadMoreError != null
-                        ? 'Unable to load more. Retry'
-                        : 'Load more tasks'),
-              )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTaskCard(TaskItemModel task) {
-    return InkWell(
-      onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => TaskDetailScreen(taskId: task.id))),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: OrbitColors.cardBorder)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Container(
-                width: 20, height: 20,
-                decoration: BoxDecoration(
-                  color: task.progressPercent >= 100 ? OrbitColors.primaryNavy : Colors.white,
-                  border: Border.all(color: OrbitColors.textMuted),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: task.progressPercent >= 100
-                    ? const Icon(Icons.check, size: 17, color: Colors.white) : null,
-              ),
-              const SizedBox(width: 14),
-              Expanded(child: Text(task.title, style: TextStyle(
-                fontSize: 14,
-                color: task.progressPercent >= 100 ? OrbitColors.textSecondary : OrbitColors.textPrimary,
-                decoration: task.progressPercent >= 100 ? TextDecoration.lineThrough : null,
-              ))),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(color: OrbitColors.bubbleBlue,
-                    borderRadius: BorderRadius.circular(999)),
-                child: Text('${task.progressPercent}% · ${task.progressPercent >= 100 ? 'Selesai' : task.progressPercent == 0 ? 'Belum Mulai' : 'In progress'}',
-                    style: const TextStyle(fontSize: 11, color: OrbitColors.textSecondary)),
-              ),
-            ]),
-            if (task.attachmentCount > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Row(children: [
-                  const Icon(Icons.attach_file, size: 14),
-                  Text(
-                      '${task.attachmentCount} attachment${task.attachmentCount == 1 ? '' : 's'}')
+                      child: Container(
+                          decoration: BoxDecoration(
+                              color: OrbitColors.cardSurface
+                                  .withValues(alpha: .88),
+                              borderRadius: BorderRadius.circular(99),
+                              border: Border.all(
+                                  color: Colors.white.withValues(alpha: .8))),
+                          child: TextField(
+                              key: const ValueKey('task-board-search'),
+                              controller: _searchController,
+                              focusNode: _searchFocus,
+                              onChanged: (value) {
+                                _searchTimer?.cancel();
+                                _searchTimer = Timer(
+                                    const Duration(milliseconds: 350), () {
+                                  if (mounted)
+                                    ref
+                                        .read(taskNotifierProvider.notifier)
+                                        .loadTasks(search: value.trim());
+                                });
+                              },
+                              decoration: const InputDecoration(
+                                  hintText: 'Search, filters & priorities',
+                                  prefixIcon: Icon(Icons.search),
+                                  filled: false,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 14),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none)))),
+                  const SizedBox(width: 8),
+                  Material(
+                      color: OrbitColors.cardSurface.withValues(alpha: .88),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                          key: const ValueKey('task-board-filters-toggle'),
+                          tooltip: 'Search, filters & priorities',
+                          isSelected: _showFilters,
+                          onPressed: () =>
+                              setState(() => _showFilters = !_showFilters),
+                          icon: const Icon(Icons.tune_rounded,
+                              color: OrbitColors.primaryNavy))),
                 ]),
-              ),
-            // Actions
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (task.priorityEligible && !task.isPersonalPriority)
-                  IconButton(
-                    tooltip: 'Add to Priority',
-                    icon: const Icon(Icons.push_pin_outlined),
-                    onPressed: () async {
-                      await ref.read(taskRepositoryProvider).addPriority(task.id);
-                      if (!mounted) return;
-                      _reloadPriorities();
-                      ref.read(taskNotifierProvider.notifier).loadTasks();
-                    },
-                  ),
-                if (task.rowAction == 'request_review')
-                  OutlinedButton(
-                    onPressed: () async {
-                      final success = await ref
-                          .read(taskRepositoryProvider)
-                          .requestReview(task.id);
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(success
-                              ? 'Review requested.'
-                              : 'Could not request review. Refresh and try again.')));
-                      if (success)
-                        ref.read(taskNotifierProvider.notifier).loadTasks();
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: OrbitColors.primaryNavy,
-                      side: const BorderSide(color: OrbitColors.cardBorder),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                    ),
-                    child: const Text('Request Review',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w600)),
-                  ),
-                if (task.rowAction == 'complete')
-                  FilledButton.icon(
-                    onPressed: () async {
-                      final success = await ref
-                          .read(taskRepositoryProvider)
-                          .completeTask(task.id);
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(success
-                              ? 'Task completed.'
-                              : 'Could not complete task. Refresh and try again.')));
-                      if (success)
-                        ref.read(taskNotifierProvider.notifier).loadTasks();
-                    },
-                    icon: const Icon(Icons.check, size: 14),
-                    label: const Text('Complete',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: OrbitColors.primaryNavy,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 6),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
+                const SizedBox(height: 12),
+                Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: .4))),
+                    child: Row(children: [
+                      for (final entry in const [
+                        (TaskBoardPeriod.today, 'Today'),
+                        (TaskBoardPeriod.week, 'This Week'),
+                        (TaskBoardPeriod.month, 'Month'),
+                        (TaskBoardPeriod.overdue, 'Overdue')
+                      ])
+                        Expanded(
+                            child: Semantics(
+                                selected: _period == entry.$1,
+                                button: true,
+                                child: InkWell(
+                                    onTap: () => _selectPeriod(entry.$1),
+                                    borderRadius: BorderRadius.circular(99),
+                                    child: AnimatedContainer(
+                                        duration: MediaQuery
+                                                .disableAnimationsOf(context)
+                                            ? Duration.zero
+                                            : const Duration(milliseconds: 220),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 9),
+                                        decoration: BoxDecoration(
+                                            color: _period == entry.$1
+                                                ? OrbitColors.primaryNavy
+                                                : Colors.transparent,
+                                            borderRadius:
+                                                BorderRadius.circular(99)),
+                                        child: Text(entry.$2,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: _period == entry.$1
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w400,
+                                                color: Colors.white))))))
+                    ])),
+                const SizedBox(height: 12),
+                Offstage(
+                    offstage: !_showFilters,
+                    child: OrbitSurface(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Row(children: [
+                            const Expanded(
+                                child: Text('Advanced filters & priorities',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700))),
+                            IconButton(
+                                tooltip: 'Close filters',
+                                onPressed: () =>
+                                    setState(() => _showFilters = false),
+                                icon: const Icon(Icons.close, size: 18))
+                          ]),
+                          const Text('Priority',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: OrbitColors.textNavy)),
+                          const SizedBox(height: 6),
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: _priorityFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting)
+                                return const LinearProgressIndicator();
+                              if (snapshot.hasError)
+                                return TextButton(
+                                    onPressed: _reloadPriorities,
+                                    child: const Text(
+                                        'Priority is unavailable. Retry'));
+                              final payload =
+                                  snapshot.data ?? const <String, dynamic>{};
+                              final rows = payload['data'] is List
+                                  ? payload['data'] as List
+                                  : const [];
+                              final meta = payload['meta'];
+                              return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (rows.isEmpty)
+                                      const Padding(
+                                          padding:
+                                              EdgeInsets.symmetric(vertical: 8),
+                                          child:
+                                              Text('No priority tasks yet.')),
+                                    for (final row in rows.whereType<Map>())
+                                      ListTile(
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                        title: Text(
+                                            (row['title'] ?? 'Task').toString(),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis),
+                                        trailing: IconButton(
+                                            tooltip: 'Remove from Priority',
+                                            icon: const Icon(
+                                                Icons.remove_circle_outline),
+                                            onPressed: () async {
+                                              await ref
+                                                  .read(taskRepositoryProvider)
+                                                  .removePriority(
+                                                      (row['task_id'] as num)
+                                                          .toInt());
+                                              if (!mounted) return;
+                                              _reloadPriorities();
+                                              ref
+                                                  .read(taskNotifierProvider
+                                                      .notifier)
+                                                  .loadTasks();
+                                            }),
+                                        onTap: () => Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                                builder: (_) =>
+                                                    TaskDetailScreen(
+                                                        taskId: (row['task_id']
+                                                                as num)
+                                                            .toInt()))),
+                                      ),
+                                    if (meta is Map &&
+                                        (meta['last_page'] as num? ?? 1) > 1)
+                                      const Text(
+                                          'Showing your saved priority tasks'),
+                                  ]);
+                            },
+                          ),
+                          const Divider(height: 24),
+                          if (canManageEc) ...[
+                            const Text('EC Today Ideas',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: OrbitColors.textNavy)),
+                            TextField(
+                              decoration: const InputDecoration(
+                                  prefixIcon: Icon(Icons.lightbulb_outline),
+                                  hintText: 'Search today ideas',
+                                  isDense: true),
+                              onChanged: (value) {
+                                _ideasSearch = value.trim();
+                                _ideasTimer?.cancel();
+                                _ideasTimer = Timer(
+                                    const Duration(milliseconds: 350), () {
+                                  if (mounted)
+                                    setState(() => _ideasFuture =
+                                        _loadIdeas(_ideasSearch));
+                                });
+                              },
+                            ),
+                            FutureBuilder<Map<String, dynamic>>(
+                              future: _ideasFuture,
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting)
+                                  return const LinearProgressIndicator();
+                                if (snapshot.hasError)
+                                  return TextButton(
+                                      onPressed: () => setState(() =>
+                                          _ideasFuture =
+                                              _loadIdeas(_ideasSearch)),
+                                      child: const Text(
+                                          'Unable to load EC ideas. Retry'));
+                                final data =
+                                    snapshot.data ?? const <String, dynamic>{};
+                                final ideas = data['data'] is List
+                                    ? data['data'] as List
+                                    : const [];
+                                return Column(children: [
+                                  if (ideas.isEmpty)
+                                    const ListTile(
+                                        title: Text('No EC ideas for today')),
+                                  for (final idea in ideas.whereType<Map>())
+                                    ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading:
+                                          const Icon(Icons.lightbulb_outline),
+                                      title: Text((idea['title'] ??
+                                              idea['idea'] ??
+                                              'EC idea')
+                                          .toString()),
+                                      subtitle: Text((idea['status_name'] ??
+                                              idea['status'] ??
+                                              '')
+                                          .toString()),
+                                    ),
+                                ]);
+                              },
+                            ),
+                            const Divider(height: 24),
+                          ],
+                          DropdownButtonFormField<String>(
+                            key: ValueKey('status-$_status'),
+                            initialValue: _status,
+                            decoration: const InputDecoration(
+                                labelText: 'Status', isDense: true),
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 'all', child: Text('All statuses')),
+                              DropdownMenuItem(
+                                  value: 'open', child: Text('Open')),
+                              DropdownMenuItem(
+                                  value: 'in_progress',
+                                  child: Text('In progress')),
+                              DropdownMenuItem(
+                                  value: 'pending_review',
+                                  child: Text('Pending review')),
+                              DropdownMenuItem(
+                                  value: 'completed', child: Text('Completed')),
+                              DropdownMenuItem(
+                                  value: 'cancelled', child: Text('Cancelled')),
+                              DropdownMenuItem(
+                                  value: 'overdue', child: Text('Overdue')),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setState(() => _status = value);
+                              ref
+                                  .read(taskNotifierProvider.notifier)
+                                  .loadTasks(status: value);
+                            },
+                          ),
+                          DropdownButtonFormField<String>(
+                            key: ValueKey('priority-$_priority'),
+                            initialValue: _priority,
+                            decoration: const InputDecoration(
+                                labelText: 'Priority', isDense: true),
+                            items: const [
+                              DropdownMenuItem(
+                                  value: '', child: Text('Any priority')),
+                              DropdownMenuItem(
+                                  value: 'low', child: Text('Low')),
+                              DropdownMenuItem(
+                                  value: 'normal', child: Text('Normal')),
+                              DropdownMenuItem(
+                                  value: 'urgent', child: Text('Urgent'))
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setState(() => _priority = value);
+                              ref
+                                  .read(taskNotifierProvider.notifier)
+                                  .loadTasks(priority: value);
+                            },
+                          ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.date_range),
+                            label: Text(_dateRange == null
+                                ? 'Filter by due date'
+                                : '${_dateRange!.start.toIso8601String().substring(0, 10)} – ${_dateRange!.end.toIso8601String().substring(0, 10)}'),
+                            onPressed: () async {
+                              final picked = await showDateRangePicker(
+                                  context: context,
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2100),
+                                  initialDateRange: _dateRange);
+                              if (picked == null || !mounted) return;
+                              setState(() {
+                                _dateRange = picked;
+                                _period = TaskBoardPeriod.all;
+                              });
+                              ref.read(taskNotifierProvider.notifier).loadTasks(
+                                  from: picked.start
+                                      .toIso8601String()
+                                      .substring(0, 10),
+                                  to: picked.end
+                                      .toIso8601String()
+                                      .substring(0, 10));
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                        ]))),
+                if (_showFilters) const SizedBox(height: 12),
+                OrbitSurface(
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 10, 12, 6),
+                              child: Row(children: [
+                                Expanded(
+                                    child: Text(
+                                        taskState.isLoading
+                                            ? 'Loading tasks…'
+                                            : showAll
+                                                ? 'Tasks (${taskState.total})'
+                                                : 'Active Tasks (${tasks.length})',
+                                        style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                            color: OrbitColors.textPrimary))),
+                                TextButton.icon(
+                                    onPressed: () =>
+                                        _selectPeriod(TaskBoardPeriod.all),
+                                    label: const Text('View All'),
+                                    icon: const Icon(Icons.arrow_forward,
+                                        size: 17),
+                                    iconAlignment: IconAlignment.end,
+                                    style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        minimumSize: const Size(0, 32),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap)),
+                              ])),
+                          if (taskState.isLoading)
+                            const Padding(
+                                padding: EdgeInsets.all(28),
+                                child:
+                                    Center(child: CircularProgressIndicator()))
+                          else if (taskState.error != null)
+                            Center(
+                                child: TextButton(
+                                    onPressed: () => ref
+                                        .read(taskNotifierProvider.notifier)
+                                        .loadTasks(),
+                                    child: const Text(
+                                        'Unable to load tasks. Tap to retry.')))
+                          else if (tasks.isEmpty)
+                            const Padding(
+                                padding: EdgeInsets.all(28),
+                                child: Center(child: Text('No tasks assigned')))
+                          else
+                            for (var i = 0; i < tasks.length; i++) ...[
+                              if (i > 0)
+                                const Divider(
+                                    height: 1, indent: 14, endIndent: 14),
+                              TaskBoardRow(
+                                  task: tasks[i],
+                                  busy: _busyTasks.contains(tasks[i].id),
+                                  onOpen: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (_) => TaskDetailScreen(
+                                              taskId: tasks[i].id))),
+                                  onAction: _busyTasks.contains(tasks[i].id) ||
+                                          !const ['complete', 'request_review']
+                                              .contains(tasks[i].rowAction)
+                                      ? null
+                                      : () => _taskAction(tasks[i]),
+                                  onPriority: tasks[i].priorityEligible &&
+                                          !tasks[i].isPersonalPriority
+                                      ? () => _addPriority(tasks[i])
+                                      : null),
+                            ],
+                          if (taskState.page < taskState.lastPage &&
+                              taskState.error == null)
+                            Center(
+                                child: TextButton(
+                                    onPressed: taskState.isLoadingMore
+                                        ? null
+                                        : () => ref
+                                            .read(taskNotifierProvider.notifier)
+                                            .loadMore(),
+                                    child: Text(taskState.isLoadingMore
+                                        ? 'Loading…'
+                                        : taskState.loadMoreError != null
+                                            ? 'Unable to load more. Retry'
+                                            : 'Load more tasks'))),
+                        ])),
+              ])),
     );
   }
 }

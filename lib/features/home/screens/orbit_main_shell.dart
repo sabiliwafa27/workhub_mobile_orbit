@@ -4,11 +4,11 @@ import '../../../core/navigation/home_navigation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/realtime/reverb_service.dart';
 import '../../../core/theme/orbit_theme.dart';
+import '../../../core/theme/orbit_motion.dart';
 import '../../../core/updater/app_updater_service.dart';
 import '../../../core/updater/update_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chat/screens/chat_list_screen.dart';
-import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
 import '../../projects/screens/projects_screen.dart';
 import '../../tasks/screens/task_screen.dart';
@@ -152,11 +152,11 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD1FAE5),
+                    color: const Color(0xFF10372C),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.chat_bubble_outline_rounded,
-                      color: Color(0xFF059669)),
+                      color: Color(0xFF34D399)),
                 ),
                 title: const Text('Customer Discussion',
                     style: TextStyle(fontWeight: FontWeight.w700)),
@@ -201,7 +201,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
           content: Text(message),
           backgroundColor: shorebird == ShorebirdUpdateResult.failed
               ? null
-              : OrbitColors.kpiGreen));
+              : OrbitColors.primaryNavyDark));
       return;
     }
     final release = await updater.checkForUpdate();
@@ -217,7 +217,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('You are using the latest version.'),
-          backgroundColor: OrbitColors.kpiGreen,
+          backgroundColor: OrbitColors.primaryNavyDark,
         ),
       );
     }
@@ -241,7 +241,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
             Center(
               child: CircleAvatar(
                 radius: 36,
-                backgroundColor: OrbitColors.bubbleBlue,
+                backgroundColor: OrbitColors.primaryNavyDark,
                 child: Text(
                   user?.name.isNotEmpty == true
                       ? user!.name[0].toUpperCase()
@@ -266,6 +266,14 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
           ],
         ),
         actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _checkForUpdates();
+            },
+            child: const Text('Check Updates',
+                style: TextStyle(color: OrbitColors.primaryNavy)),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Close',
@@ -343,40 +351,66 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final inboxCount = ref.watch(inboxNotifierProvider).items.length;
-
     final pages = [
       OrbitDashboardView(
         onOpenSearch: () => setState(() => _currentIndex = 2),
-        onOpenNotifications: () => setState(() => _currentIndex = 1),
+        onOpenNotifications: () => setState(() => _currentIndex = 4),
+        onOpenTasks: () => setState(() => _currentIndex = 2),
+        onOpenProjects: () => setState(() => _currentIndex = 3),
+        onOpenErp: () => setState(() => _currentIndex = 4),
+        onOpenProfile: _showProfileDialog,
         onOpenCheckIn: _showQuickActionSheet,
       ),
-      InboxScreen(isActive: _currentIndex == 1),
-      const TaskScreen(),
+      const ChatListScreen(),
+      TaskScreen(
+          onOpenNotifications: () => setState(() => _currentIndex = 4),
+          onOpenProfile: _showProfileDialog),
       const ProjectsScreen(),
+      InboxScreen(isActive: _currentIndex == 4),
     ];
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _back();
-      },
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: IndexedStack(
-          index: _currentIndex,
-          children: pages,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness:
+              _currentIndex == 0 ? Brightness.light : Brightness.dark,
+          systemNavigationBarColor: OrbitColors.scaffoldBackground,
+          systemNavigationBarIconBrightness: Brightness.dark,
         ),
-        bottomNavigationBar:
-            SafeArea(top: false, child: _buildFloatingBottomNav(inboxCount)),
-      ),
-    );
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) _back();
+          },
+          child: Scaffold(
+            extendBody: _currentIndex == 0,
+            backgroundColor: Colors.transparent,
+            body: IndexedStack(
+              index: _currentIndex,
+              children: [
+                for (var i = 0; i < pages.length; i++)
+                  TickerMode(
+                    enabled: _currentIndex == i,
+                    child: OrbitEntrance(
+                      key: ValueKey(i),
+                      active: _currentIndex == i,
+                      child: pages[i],
+                    ),
+                  ),
+              ],
+            ),
+            bottomNavigationBar:
+                SafeArea(top: false, child: _buildFloatingBottomNav()),
+          ),
+        ));
   }
 
-  Widget _buildFloatingBottomNav(int inboxCount) {
+  Widget _buildFloatingBottomNav() {
     return Container(
-      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-      height: 66,
+      key: const ValueKey('orbit-bottom-navigation'),
+      margin: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
+      height:
+          64 + (MediaQuery.textScalerOf(context).scale(10) - 10).clamp(0, 24),
       decoration: BoxDecoration(
         color: OrbitColors.cardSurface,
         borderRadius: BorderRadius.circular(32),
@@ -402,9 +436,8 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
           // 2. Inbox (with live count badge)
           _buildNavItem(
             index: 1,
-            icon: Icons.all_inbox_rounded,
-            label: 'Inbox',
-            badgeCount: inboxCount > 0 ? inboxCount : null,
+            icon: Icons.chat_bubble_outline_rounded,
+            label: 'Chat',
           ),
 
           // 3. Tasks
@@ -420,6 +453,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
             icon: Icons.folder_outlined,
             label: 'Projects',
           ),
+          _buildNavItem(index: 4, icon: Icons.grid_view_rounded, label: 'ERP'),
         ],
       ),
     );
@@ -438,12 +472,16 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
       borderRadius: BorderRadius.circular(999),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        child: Container(
+        child: AnimatedContainer(
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFDFEAFF) : Colors.transparent,
+            color: isSelected ? OrbitColors.bubbleBlue : Colors.transparent,
             borderRadius: BorderRadius.circular(999),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -452,7 +490,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
                 children: [
                   Icon(
                     icon,
-                    size: 22,
+                    size: 24,
                     color: isSelected
                         ? OrbitColors.navActive
                         : OrbitColors.navInactive,
@@ -486,6 +524,8 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
               const SizedBox(height: 2),
               Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,

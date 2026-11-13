@@ -19,48 +19,70 @@ class _Storage extends SecureStorageService {
 class _InboxRepository extends InboxRepository {
   _InboxRepository(ApiClient client) : super(client);
   final requests = <({String status, String search})>[];
-  final reads = <({String module, String key, String? type, String? identity})>[];
+  final reads =
+      <({String module, String key, String? type, String? identity})>[];
   final notificationReads = <int>[];
   bool emptySearch = false;
   bool fail = false;
 
   @override
-  Future<void> markMentionNotificationsRead(List<int> ids) async => notificationReads.addAll(ids);
+  Future<void> markMentionNotificationsRead(List<int> ids) async =>
+      notificationReads.addAll(ids);
 
   @override
-  Future<bool> markRead(String module, String subjectKey, {String? readSubjectType, String? readSubjectKey}) async {
-    reads.add((module: module, key: subjectKey, type: readSubjectType, identity: readSubjectKey));
+  Future<bool> markRead(String module, String subjectKey,
+      {String? readSubjectType, String? readSubjectKey}) async {
+    reads.add((
+      module: module,
+      key: subjectKey,
+      type: readSubjectType,
+      identity: readSubjectKey
+    ));
     return true;
   }
 
   @override
-  Future<InboxFetchResult> fetchTodos({String status = 'pending', String search = ''}) async {
+  Future<InboxFetchResult> fetchTodos(
+      {String status = 'pending', String search = ''}) async {
     requests.add((status: status, search: search));
     if (fail) throw Exception('Network unavailable');
     return InboxFetchResult(
       incompleteCount: 1,
       completeCount: 1,
-      sourceCounts: emptySearch && search.isNotEmpty ? const {} : const {'guest-book': [3, 2, 1, 0]},
+      sourceCounts: emptySearch && search.isNotEmpty
+          ? const {}
+          : const {
+              'guest-book': [3, 2, 1, 0]
+            },
       sourceCountsComplete: true,
-      items: emptySearch && search.isNotEmpty ? [] : [InboxItemModel.fromJson({
-        'id': status == 'complete' ? '2' : '1',
-        'title': status == 'complete' ? 'Finished item' : 'Pending item',
-        'module_code': 'guest-book',
-        'subject_key': '42',
-        'has_unread': true,
-        'mention_unread_count': 2,
-        'mention_notification_ids': [7, 8],
-      })],
+      items: emptySearch && search.isNotEmpty
+          ? []
+          : [
+              InboxItemModel.fromJson({
+                'id': status == 'complete' ? '2' : '1',
+                'title':
+                    status == 'complete' ? 'Finished item' : 'Pending item',
+                'module_code': 'guest-book',
+                'subject_key': '42',
+                'has_unread': true,
+                'mention_unread_count': 2,
+                'mention_notification_ids': [7, 8],
+              })
+            ],
     );
   }
 }
 
 void main() {
-  testWidgets('Inbox error hides stale counts and retry reloads', (tester) async {
+  testWidgets('Inbox error hides stale counts and retry reloads',
+      (tester) async {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
     await tester.pumpWidget(ProviderScope(
-      overrides: [inboxNotifierProvider.overrideWith((ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))],
+      overrides: [
+        inboxNotifierProvider.overrideWith((ref) =>
+            InboxNotifier(repository, ReverbRealtimeService(api), null))
+      ],
       child: const MaterialApp(home: InboxScreen()),
     ));
     await tester.pumpAndSettle();
@@ -69,7 +91,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.refresh_rounded));
     await tester.pumpAndSettle();
     expect(find.text('Incomplete (1)'), findsNothing);
-    expect(find.text('Unable to load Inbox. Please try again.'), findsOneWidget);
+    expect(
+        find.text('Unable to load Inbox. Please try again.'), findsOneWidget);
     repository.fail = false;
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
@@ -83,7 +106,10 @@ void main() {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
     await tester.pumpWidget(ProviderScope(
-      overrides: [inboxNotifierProvider.overrideWith((ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))],
+      overrides: [
+        inboxNotifierProvider.overrideWith((ref) =>
+            InboxNotifier(repository, ReverbRealtimeService(api), null))
+      ],
       child: const MaterialApp(home: InboxScreen()),
     ));
     await tester.pumpAndSettle();
@@ -91,11 +117,15 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('selected source keeps its label when search has no results', (tester) async {
+  testWidgets('selected source keeps its label when search has no results',
+      (tester) async {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api)..emptySearch = true;
     await tester.pumpWidget(ProviderScope(
-      overrides: [inboxNotifierProvider.overrideWith((ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))],
+      overrides: [
+        inboxNotifierProvider.overrideWith((ref) =>
+            InboxNotifier(repository, ReverbRealtimeService(api), null))
+      ],
       child: const MaterialApp(home: InboxScreen()),
     ));
     await tester.pumpAndSettle();
@@ -119,7 +149,10 @@ void main() {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
     await tester.pumpWidget(ProviderScope(
-      overrides: [inboxNotifierProvider.overrideWith((ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))],
+      overrides: [
+        inboxNotifierProvider.overrideWith((ref) =>
+            InboxNotifier(repository, ReverbRealtimeService(api), null))
+      ],
       child: const MaterialApp(home: InboxScreen()),
     ));
     await tester.pumpAndSettle();
@@ -133,11 +166,15 @@ void main() {
     expect(find.text('Incomplete (1)'), findsOneWidget);
   });
 
-  testWidgets('status selection and search use the same Inbox view', (tester) async {
+  testWidgets('status selection and search use the same Inbox view',
+      (tester) async {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
     await tester.pumpWidget(ProviderScope(
-      overrides: [inboxNotifierProvider.overrideWith((ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))],
+      overrides: [
+        inboxNotifierProvider.overrideWith((ref) =>
+            InboxNotifier(repository, ReverbRealtimeService(api), null))
+      ],
       child: const MaterialApp(home: InboxScreen()),
     ));
     await tester.pumpAndSettle();
@@ -158,14 +195,19 @@ void main() {
     await tester.tap(find.text('Reset filters'));
     await tester.pumpAndSettle();
     expect(repository.requests.last, (status: 'pending', search: ''));
-    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, isEmpty);
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        isEmpty);
   });
 
-  testWidgets('switching status applies the search before debounce expires', (tester) async {
+  testWidgets('switching status applies the search before debounce expires',
+      (tester) async {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
     await tester.pumpWidget(ProviderScope(
-      overrides: [inboxNotifierProvider.overrideWith((ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))],
+      overrides: [
+        inboxNotifierProvider.overrideWith((ref) =>
+            InboxNotifier(repository, ReverbRealtimeService(api), null))
+      ],
       child: const MaterialApp(home: InboxScreen()),
     ));
     await tester.pumpAndSettle();
@@ -182,7 +224,10 @@ void main() {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
     await tester.pumpWidget(ProviderScope(
-      overrides: [inboxNotifierProvider.overrideWith((ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))],
+      overrides: [
+        inboxNotifierProvider.overrideWith((ref) =>
+            InboxNotifier(repository, ReverbRealtimeService(api), null))
+      ],
       child: const MaterialApp(home: InboxScreen()),
     ));
     await tester.pumpAndSettle();
@@ -192,19 +237,28 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     expect(repository.requests.last, (status: 'pending', search: ''));
-    expect(repository.requests.where((request) => request.search == 'visitor'), isEmpty);
+    expect(repository.requests.where((request) => request.search == 'visitor'),
+        isEmpty);
   });
 
-  testWidgets('reopened Inbox restores the active status and search', (tester) async {
+  testWidgets('reopened Inbox restores the active status and search',
+      (tester) async {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
-    final container = ProviderContainer(overrides: [inboxNotifierProvider.overrideWith((ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))]);
+    final container = ProviderContainer(overrides: [
+      inboxNotifierProvider.overrideWith(
+          (ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))
+    ]);
     addTearDown(container.dispose);
-    await container.read(inboxNotifierProvider.notifier).loadInbox(status: 'complete', search: 'visitor');
-    await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const MaterialApp(home: InboxScreen())));
+    await container
+        .read(inboxNotifierProvider.notifier)
+        .loadInbox(status: 'complete', search: 'visitor');
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: container, child: const MaterialApp(home: InboxScreen())));
     await tester.pumpAndSettle();
     expect(find.text('Complete (1)'), findsOneWidget);
-    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, 'visitor');
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'visitor');
     expect(find.text('Finished item'), findsOneWidget);
   });
 
@@ -212,19 +266,25 @@ void main() {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
     await tester.pumpWidget(ProviderScope(
-      overrides: [inboxRepositoryProvider.overrideWithValue(repository), inboxNotifierProvider.overrideWith((ref) => InboxNotifier(repository, ReverbRealtimeService(api), null))],
+      overrides: [
+        inboxRepositoryProvider.overrideWithValue(repository),
+        inboxNotifierProvider.overrideWith((ref) =>
+            InboxNotifier(repository, ReverbRealtimeService(api), null))
+      ],
       child: const MaterialApp(home: InboxScreen()),
     ));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Pending item'));
     await tester.pumpAndSettle();
-    expect(repository.reads.single, (module: 'guest-book', key: '42', type: 'guest', identity: '42'));
+    expect(repository.reads.single,
+        (module: 'guest-book', key: '42', type: 'guest', identity: '42'));
     expect(repository.notificationReads, [7, 8]);
     expect(repository.requests.length, greaterThan(1));
     await tester.ensureVisible(find.text('Mark as read'));
     await tester.tap(find.text('Mark as read'));
     await tester.pumpAndSettle();
-    expect(repository.reads.last, (module: 'guest-book', key: '42', type: 'guest', identity: '42'));
+    expect(repository.reads.last,
+        (module: 'guest-book', key: '42', type: 'guest', identity: '42'));
     expect(repository.notificationReads, [7, 8, 7, 8]);
   });
 }

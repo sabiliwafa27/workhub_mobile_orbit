@@ -36,16 +36,20 @@ class ChatRepository {
 
   ChatRepository(this._apiClient);
 
-  Future<List<ChatItemModel>> fetchConversations({String? search, String? filter}) async {
+  Future<List<ChatItemModel>> fetchConversations(
+      {String? search, String? filter}) async {
     try {
       final queryParams = <String, dynamic>{};
       if (search != null && search.isNotEmpty) queryParams['search'] = search;
       if (filter != null && filter.isNotEmpty) queryParams['filter'] = filter;
 
-      final response = await _apiClient.dio.get('/conversations', queryParameters: queryParams);
+      final response = await _apiClient.dio
+          .get('/conversations', queryParameters: queryParams);
       if (response.data is Map && response.data['data'] is List) {
         final list = response.data['data'] as List;
-        return list.map((json) => ChatItemModel.fromJson(json as Map<String, dynamic>)).toList();
+        return list
+            .map((json) => ChatItemModel.fromJson(json as Map<String, dynamic>))
+            .toList();
       }
       return [];
     } catch (e) {
@@ -93,7 +97,8 @@ class ChatNotifier extends StateNotifier<ChatListState> {
   final ReverbRealtimeService _reverb;
   final int? _userId;
 
-  ChatNotifier(this._repo, this._reverb, this._userId) : super(ChatListState()) {
+  ChatNotifier(this._repo, this._reverb, this._userId)
+      : super(ChatListState()) {
     loadChats();
     _setupRealtime();
   }
@@ -101,7 +106,8 @@ class ChatNotifier extends StateNotifier<ChatListState> {
   Future<void> loadChats({String? search, String? filter}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final items = await _repo.fetchConversations(search: search, filter: filter);
+      final items =
+          await _repo.fetchConversations(search: search, filter: filter);
       state = state.copyWith(chats: items, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -132,7 +138,8 @@ class ChatNotifier extends StateNotifier<ChatListState> {
   }
 }
 
-final chatNotifierProvider = StateNotifierProvider<ChatNotifier, ChatListState>((ref) {
+final chatNotifierProvider =
+    StateNotifierProvider<ChatNotifier, ChatListState>((ref) {
   final repo = ref.watch(chatRepositoryProvider);
   final reverb = ref.watch(reverbServiceProvider);
   final user = ref.watch(authProvider).user;

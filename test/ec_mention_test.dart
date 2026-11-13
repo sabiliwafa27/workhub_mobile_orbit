@@ -22,51 +22,95 @@ class _Adapter implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
   @override
-  Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
+  Future<ResponseBody> fetch(RequestOptions options,
+      Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
     requests.add(options);
     final response = options.method == 'GET'
-        ? {'data': options.queryParameters['search'] == 'José' ? [{'employee_id': 5, 'full_name': 'José'}] : [{'employee_id': 2, 'full_name': 'First'}]}
+        ? {
+            'data': options.queryParameters['search'] == 'José'
+                ? [
+                    {'employee_id': 5, 'full_name': 'José'}
+                  ]
+                : [
+                    {'employee_id': 2, 'full_name': 'First'}
+                  ]
+          }
         : {'message': 'Created'};
-    return ResponseBody.fromString(jsonEncode(response), options.method == 'GET' ? 200 : failCreate ? 503 : 201,
-        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]});
+    return ResponseBody.fromString(
+        jsonEncode(response),
+        options.method == 'GET'
+            ? 200
+            : failCreate
+                ? 503
+                : 201,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType]
+        });
   }
 }
 
 void main() {
-  testWidgets('uncertain EC batch retries with the original keys', (tester) async {
+  testWidgets('uncertain EC batch retries with the original keys',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final adapter = _Adapter()..failCreate = true;
-    final api = ApiClient(customDio: Dio()..httpClientAdapter = adapter, customStorage: _Storage());
+    final api = ApiClient(
+        customDio: Dio()..httpClientAdapter = adapter,
+        customStorage: _Storage());
     await tester.pumpWidget(ProviderScope(
-      overrides: [apiClientProvider.overrideWithValue(api), ecCreationPolicyProvider.overrideWith((ref) async => const EcCreationPolicy(canEdit: true))],
+      overrides: [
+        apiClientProvider.overrideWithValue(api),
+        ecCreationPolicyProvider
+            .overrideWith((ref) async => const EcCreationPolicy(canEdit: true))
+      ],
       child: const MaterialApp(home: CreateWorkItemScreen(isEc: true)),
     ));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Your idea'), 'First idea');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Your idea'), 'First idea');
     tester.testTextInput.hide();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add idea'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Idea'), 'Second idea');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Idea'), 'Second idea');
     tester.testTextInput.hide();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
-    expect(tester.widget<IconButton>(find.ancestor(of: find.byIcon(Icons.close), matching: find.byType(IconButton)).first).onPressed, isNull);
+    expect(
+        tester
+            .widget<IconButton>(find
+                .ancestor(
+                    of: find.byIcon(Icons.close),
+                    matching: find.byType(IconButton))
+                .first)
+            .onPressed,
+        isNull);
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
-    final posts = adapter.requests.where((request) => request.method == 'POST').toList();
+    final posts =
+        adapter.requests.where((request) => request.method == 'POST').toList();
     expect(posts.length, 2);
-    Map body(RequestOptions request) => request.data is String ? jsonDecode(request.data as String) as Map : request.data as Map;
+    Map body(RequestOptions request) => request.data is String
+        ? jsonDecode(request.data as String) as Map
+        : request.data as Map;
     expect(body(posts[0])['ideas'], body(posts[1])['ideas']);
   });
 
-  testWidgets('uncertain EC creation cannot retry with changed ideas', (tester) async {
+  testWidgets('uncertain EC creation cannot retry with changed ideas',
+      (tester) async {
     final adapter = _Adapter()..failCreate = true;
-    final api = ApiClient(customDio: Dio()..httpClientAdapter = adapter, customStorage: _Storage());
+    final api = ApiClient(
+        customDio: Dio()..httpClientAdapter = adapter,
+        customStorage: _Storage());
     await tester.pumpWidget(ProviderScope(
-      overrides: [apiClientProvider.overrideWithValue(api), ecCreationPolicyProvider.overrideWith((ref) async => const EcCreationPolicy(canEdit: true))],
+      overrides: [
+        apiClientProvider.overrideWithValue(api),
+        ecCreationPolicyProvider
+            .overrideWith((ref) async => const EcCreationPolicy(canEdit: true))
+      ],
       child: const MaterialApp(home: CreateWorkItemScreen(isEc: true)),
     ));
     await tester.pumpAndSettle();
@@ -81,15 +125,26 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
-    expect(adapter.requests.where((request) => request.method == 'POST').length, 1);
-    expect(find.text('The previous submission could not be confirmed. Restore the same ideas to retry, or check today’s EC before starting again.'), findsOneWidget);
+    expect(adapter.requests.where((request) => request.method == 'POST').length,
+        1);
+    expect(
+        find.text(
+            'The previous submission could not be confirmed. Restore the same ideas to retry, or check today’s EC before starting again.'),
+        findsOneWidget);
   });
 
-  testWidgets('typing @ searches colleagues inline and replaces the query', (tester) async {
+  testWidgets('typing @ searches colleagues inline and replaces the query',
+      (tester) async {
     final adapter = _Adapter();
-    final api = ApiClient(customDio: Dio()..httpClientAdapter = adapter, customStorage: _Storage());
+    final api = ApiClient(
+        customDio: Dio()..httpClientAdapter = adapter,
+        customStorage: _Storage());
     await tester.pumpWidget(ProviderScope(
-      overrides: [apiClientProvider.overrideWithValue(api), ecCreationPolicyProvider.overrideWith((ref) async => const EcCreationPolicy(canEdit: true))],
+      overrides: [
+        apiClientProvider.overrideWithValue(api),
+        ecCreationPolicyProvider
+            .overrideWith((ref) async => const EcCreationPolicy(canEdit: true))
+      ],
       child: const MaterialApp(home: CreateWorkItemScreen(isEc: true)),
     ));
     await tester.pumpAndSettle();
@@ -104,30 +159,47 @@ void main() {
     expect(tester.widget<TextField>(idea).controller!.text, 'Hello @José ');
   });
 
-  testWidgets('EC mentions search and shift using Unicode character positions', (tester) async {
+  testWidgets('EC mentions search and shift using Unicode character positions',
+      (tester) async {
     final adapter = _Adapter();
-    final api = ApiClient(customDio: Dio()..httpClientAdapter = adapter, customStorage: _Storage());
+    final api = ApiClient(
+        customDio: Dio()..httpClientAdapter = adapter,
+        customStorage: _Storage());
     await tester.pumpWidget(ProviderScope(
-      overrides: [apiClientProvider.overrideWithValue(api), ecCreationPolicyProvider.overrideWith((ref) async => const EcCreationPolicy(canEdit: true))],
-      child: MaterialApp(home: Builder(builder: (context) => Scaffold(body: TextButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateWorkItemScreen(isEc: true))),
-        child: const Text('Open form'),
-      )))),
+      overrides: [
+        apiClientProvider.overrideWithValue(api),
+        ecCreationPolicyProvider
+            .overrideWith((ref) async => const EcCreationPolicy(canEdit: true))
+      ],
+      child: MaterialApp(
+          home: Builder(
+              builder: (context) => Scaffold(
+                      body: TextButton(
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                const CreateWorkItemScreen(isEc: true))),
+                    child: const Text('Open form'),
+                  )))),
     ));
     await tester.tap(find.text('Open form'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Your idea'), 'Hi 😀 ');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Your idea'), 'Hi 😀 ');
     tester.testTextInput.hide();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mention colleague'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Search colleagues'), 'José');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Search colleagues'), 'José');
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(ListTile, 'José'), findsOneWidget);
     await tester.tap(find.widgetWithText(ListTile, 'José'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Your idea'), 'Start Hi 😀 @José ');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Your idea'), 'Start Hi 😀 @José ');
     tester.testTextInput.hide();
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Create'));
@@ -136,7 +208,9 @@ void main() {
 
     final request = adapter.requests.last;
     expect(request.uri.path, '/workhub/api/v1/ec/entries');
-    final data = request.data is String ? jsonDecode(request.data as String) as Map : request.data as Map;
+    final data = request.data is String
+        ? jsonDecode(request.data as String) as Map
+        : request.data as Map;
     final mention = (data['mentions'] as List).single as Map;
     expect(mention['employee_id'], 5);
     expect(mention['label'], '@José');

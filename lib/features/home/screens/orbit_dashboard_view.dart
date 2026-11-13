@@ -5,6 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/orbit_theme.dart';
+import '../../../core/theme/orbit_motion.dart';
+import '../providers/dashboard_provider.dart';
+import 'orbit_dashboard_components.dart';
+import '../../projects/screens/projects_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
@@ -32,12 +36,17 @@ class OrbitDashboardView extends ConsumerStatefulWidget {
   final VoidCallback onOpenSearch;
   final VoidCallback onOpenNotifications;
   final VoidCallback onOpenCheckIn;
+  final VoidCallback? onOpenTasks, onOpenProjects, onOpenErp, onOpenProfile;
 
   const OrbitDashboardView({
     super.key,
     required this.onOpenSearch,
     required this.onOpenNotifications,
     required this.onOpenCheckIn,
+    this.onOpenTasks,
+    this.onOpenProjects,
+    this.onOpenErp,
+    this.onOpenProfile,
   });
 
   @override
@@ -168,14 +177,31 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   int _ecPage = 1;
   bool _showEc = false;
   int _selectedVisitFilter = 0; // 0: All, 1: Open, 2: Check in, 3: Closed
-  bool _isClockedIn = false;
-  DateTime? _clockInTime;
+  DashboardPeriod _period = DashboardPeriod.today;
+
+  void _openTasks() => (widget.onOpenTasks ?? widget.onOpenSearch)();
+  void _openProjects() {
+    if (widget.onOpenProjects != null) {
+      widget.onOpenProjects!();
+      return;
+    }
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ProjectsScreen()));
+  }
+
   final Set<int> _pendingTaskActions = {};
   final Set<int> _uncertainTaskActions = {};
 
   Future<void> _refreshTasks() async {
-    await ref.read(taskNotifierProvider.notifier).loadTasks();
-    if (mounted && ref.read(taskNotifierProvider).error == null) {
+    final period = _period;
+    final notifier = ref.read(dashboardTasksProvider(period).notifier);
+    await notifier.loadTasks();
+    if (mounted &&
+        _period == period &&
+        identical(
+            ref.read(dashboardTasksProvider(period).notifier), notifier) &&
+        !ref.read(dashboardTasksProvider(period)).isLoading &&
+        ref.read(dashboardTasksProvider(period)).error == null) {
       setState(() => _uncertainTaskActions.clear());
     }
   }
@@ -192,8 +218,9 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           : await repository.completeTask(task.id);
       if (!mounted) return;
       if (success) {
-        await ref.read(taskNotifierProvider.notifier).loadTasks();
+        await ref.read(dashboardTasksProvider(_period).notifier).loadTasks();
         if (mounted) {
+          ref.read(taskNotifierProvider.notifier).loadTasks();
           ref.invalidate(_dashboardInboxProvider);
           ref.read(inboxNotifierProvider.notifier).loadInbox();
         }
@@ -212,7 +239,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     final userName = user?.name.split(' ').first ?? 'User';
-    final taskState = ref.watch(taskNotifierProvider);
+    final taskState = ref.watch(dashboardTasksProvider(_period));
     final dashboardInbox = ref.watch(_dashboardInboxProvider);
     final inbox = dashboardInbox.valueOrNull;
     final inboxState = InboxListState(
@@ -229,889 +256,723 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     final visitTargets = visitTargetsAsync.value ?? [];
 
     return Scaffold(
-      backgroundColor: OrbitColors.scaffoldBackground,
-      floatingActionButton: FloatingActionButton.large(
-        tooltip: 'Create task or EC',
-        onPressed: () async {
-          final isEc = await showModalBottomSheet<bool>(
-            context: context,
-            builder: (context) => SafeArea(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-              ListTile(
-                  title: const Text('Create EC'),
-                  onTap: () => Navigator.pop(context, true)),
-              ListTile(
-                  title: const Text('Create task'),
-                  onTap: () => Navigator.pop(context, false)),
-            ])),
-          );
-          if (isEc == null || !context.mounted) return;
-          final created = await Navigator.push<bool>(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => CreateWorkItemScreen(isEc: isEc)));
-          if (created == true && context.mounted) {
-            setState(() => _ecPage = 1);
-            ref.invalidate(ecProgressProvider(1));
-            ref.invalidate(_dashboardInboxProvider);
-            ref.read(taskNotifierProvider.notifier).loadTasks();
-            ref.read(inboxNotifierProvider.notifier).loadInbox();
-          }
-        },
-        child: const Icon(Icons.add),
-      ),
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          color: OrbitColors.primaryNavy,
-          onRefresh: () async {
-            await _refreshTasks();
-            if (!mounted) return;
-            await ref.read(inboxNotifierProvider.notifier).loadInbox();
-            if (!mounted) return;
-            ref.invalidate(_dashboardInboxProvider);
-            ref.invalidate(ecProgressProvider(_ecPage));
-            ref.invalidate(visitTargetsNotifierProvider);
-          },
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(
-                left: 16, right: 16, top: 12, bottom: 100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Top Brand Header
-                _buildTopBrandHeader(),
-                const SizedBox(height: 16),
-
-                // 2. Greeting & Sun Horizon
-                _buildGreetingSection(userName),
-                const SizedBox(height: 16),
-
-                // 3. Search & Quick Action Pill
-                _buildSearchBar(),
-                const SizedBox(height: 16),
-
-                // 4. Primarasa Food Industri Clock-in Card
-                _buildAttendanceCard(),
-                const SizedBox(height: 16),
-
-                // 5. Dynamic Date Strip Capsule
-                _buildDateStrip(),
-                const SizedBox(height: 16),
-
-                // 6. Live Overview & Progress Row
-                _buildScoreAndPerformanceRow(taskState, inboxState),
-                const SizedBox(height: 20),
-
-                // 7. Live Assigned Tasks Section
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: false, label: Text('Tasks')),
-                    ButtonSegment(value: true, label: Text('EC'))
-                  ],
-                  selected: {_showEc},
-                  onSelectionChanged: (selection) =>
-                      setState(() => _showEc = selection.first),
-                ),
-                const SizedBox(height: 12),
-                if (!_showEc) _buildActiveTasksSection(taskState),
-                if (_showEc) ...[
-                  const Text('Energy of Creation',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: OrbitColors.textNavy)),
-                  const SizedBox(height: 10),
-                  ecProgress.when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (_, __) => TextButton(
-                        onPressed: () =>
-                            ref.invalidate(ecProgressProvider(_ecPage)),
-                        child: const Text(
-                            'Unable to load EC progress. Tap to retry.')),
-                    data: (payload) {
-                      final items = payload['data'] as List;
-                      final meta = payload['meta'];
-                      final lastPage = meta is Map
-                          ? (meta['last_page'] as num? ?? 1).toInt()
-                          : 1;
-                      return Column(children: [
-                        if (items.isEmpty)
-                          const Text('No EC entries on this page.'),
-                        for (final item in items)
-                          _EcProgressRow(
-                            key: ValueKey(item['id']),
-                            entry: Map<String, dynamic>.from(item as Map),
-                            canEdit: payload['can_edit'] == true,
-                            page: _ecPage,
-                          ),
-                        if (lastPage > 1 || _ecPage > 1)
-                          Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                TextButton(
-                                    onPressed: _ecPage > 1
-                                        ? () => setState(() => _ecPage--)
-                                        : null,
-                                    child: const Text('Previous')),
-                                Text('$_ecPage / $lastPage'),
-                                TextButton(
-                                    onPressed: _ecPage < lastPage
-                                        ? () => setState(() => _ecPage++)
-                                        : null,
-                                    child: const Text('Next')),
-                              ]),
-                      ]);
-                    },
-                  ),
-                ],
-                const SizedBox(height: 20),
-
-                // 8. Live Unified Inbox & Approvals Section
-                _buildPendingInboxSection(inboxState),
-                const SizedBox(height: 20),
-
-                // 9. Today's Scheduled Visits (only if visit targets exist)
-                if (visitTargets.isNotEmpty) ...[
-                  _buildTodayVisitsSection(visitTargets),
-                  const SizedBox(height: 16),
-                  _buildTopStoresList(visitTargets),
-                  const SizedBox(height: 16),
-                ],
+      backgroundColor: Colors.transparent,
+      body: Stack(children: [
+        const Positioned.fill(
+            child: DecoratedBox(
+                decoration: BoxDecoration(
+          gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                OrbitColors.primaryNavyDark,
+                OrbitColors.scaffoldBackground,
+                OrbitColors.scaffoldBackground
               ],
+              stops: [
+                0,
+                .48,
+                1
+              ]),
+        ))),
+        Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 260,
+            child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (bounds) => const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.white, Colors.white, Colors.transparent],
+                    stops: [0, .62, 1]).createShader(bounds),
+                child: Image.asset('assets/images/dashboard_mountains.png',
+                    fit: BoxFit.cover, alignment: Alignment.topCenter))),
+        SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            color: OrbitColors.primaryNavy,
+            onRefresh: () async {
+              await _refreshTasks();
+              if (!mounted) return;
+              await ref.read(inboxNotifierProvider.notifier).loadInbox();
+              if (!mounted) return;
+              ref.invalidate(_dashboardInboxProvider);
+              ref.invalidate(ecProgressProvider(_ecPage));
+              ref.invalidate(visitTargetsNotifierProvider);
+              ref.invalidate(dashboardTaskStatsProvider(_period));
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(
+                  left: 12, right: 12, top: 12, bottom: 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  OrbitEntrance(child: _buildReferenceHeader(userName)),
+                  const SizedBox(height: 10),
+                  OrbitEntrance(
+                      delay: const Duration(milliseconds: 60),
+                      child: _buildPeriodPicker()),
+                  const SizedBox(height: 12),
+                  OrbitEntrance(
+                      delay: const Duration(milliseconds: 110),
+                      child: _buildReferenceMetrics(taskState, inbox)),
+                  const SizedBox(height: 12),
+                  OrbitEntrance(
+                      delay: const Duration(milliseconds: 170),
+                      child: DashboardProgress(
+                        stats: ref
+                            .watch(dashboardTaskStatsProvider(_period))
+                            .valueOrNull,
+                        loading: ref
+                            .watch(dashboardTaskStatsProvider(_period))
+                            .isLoading,
+                        onViewAll: _openTasks,
+                      )),
+                  const SizedBox(height: 12),
+                  OrbitEntrance(
+                      delay: const Duration(milliseconds: 210),
+                      child: DashboardShortcuts(
+                          onTasks: () => setState(() => _showEc = false),
+                          onInbox: widget.onOpenNotifications,
+                          onProjects: _openProjects,
+                          onErp: widget.onOpenErp ?? widget.onOpenNotifications,
+                          unread: inbox?.incompleteUnreadCount)),
+                  const SizedBox(height: 12),
+                  if (!_showEc)
+                    OrbitEntrance(
+                        delay: const Duration(milliseconds: 250),
+                        child: _buildActiveTasksSection(taskState)),
+                  if (_showEc) ...[
+                    TextButton(
+                        onPressed: () => setState(() => _showEc = false),
+                        child: const Text('Back to My Tasks')),
+                    const Text('Energy of Creation',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: OrbitColors.textNavy)),
+                    const SizedBox(height: 10),
+                    ecProgress.when(
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (_, __) => TextButton(
+                          onPressed: () =>
+                              ref.invalidate(ecProgressProvider(_ecPage)),
+                          child: const Text(
+                              'Unable to load EC progress. Tap to retry.')),
+                      data: (payload) {
+                        final items = payload['data'] as List;
+                        final meta = payload['meta'];
+                        final lastPage = meta is Map
+                            ? (meta['last_page'] as num? ?? 1).toInt()
+                            : 1;
+                        return Column(children: [
+                          if (items.isEmpty)
+                            const Text('No EC entries on this page.'),
+                          for (final item in items)
+                            _EcProgressRow(
+                              key: ValueKey(item['id']),
+                              entry: Map<String, dynamic>.from(item as Map),
+                              canEdit: payload['can_edit'] == true,
+                              page: _ecPage,
+                            ),
+                          if (lastPage > 1 || _ecPage > 1)
+                            Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  TextButton(
+                                      onPressed: _ecPage > 1
+                                          ? () => setState(() => _ecPage--)
+                                          : null,
+                                      child: const Text('Previous')),
+                                  Text('$_ecPage / $lastPage'),
+                                  TextButton(
+                                      onPressed: _ecPage < lastPage
+                                          ? () => setState(() => _ecPage++)
+                                          : null,
+                                      child: const Text('Next')),
+                                ]),
+                        ]);
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+
+                  // 8. Live Unified Inbox & Approvals Section
+                  _buildPendingInboxSection(inboxState),
+                  const SizedBox(height: 20),
+
+                  // 9. Today's Scheduled Visits (only if visit targets exist)
+                  if (visitTargets.isNotEmpty) ...[
+                    _buildTodayVisitsSection(visitTargets),
+                    const SizedBox(height: 16),
+                    _buildTopStoresList(visitTargets),
+                    const SizedBox(height: 16),
+                  ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
+      ]),
     );
   }
 
-  Widget _buildTopBrandHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-            child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: const BoxDecoration(
-                color: OrbitColors.primaryNavy,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.radio_button_checked,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-                child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: RichText(
-                      text: const TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Orbit ',
-                            style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w800,
-                              color: OrbitColors.primaryNavy,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'WorkHub',
-                            style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w600,
-                              color: OrbitColors.brandOrange,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ))),
-          ],
-        )),
-      ],
+  Future<void> _showCreateMenu() async {
+    final isEc = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (context) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ListTile(
+            title: const Text('Create EC'),
+            onTap: () => Navigator.pop(context, true)),
+        ListTile(
+            title: const Text('Create task'),
+            onTap: () => Navigator.pop(context, false)),
+      ])),
     );
+    if (isEc == null || !context.mounted) return;
+    final created = await Navigator.push<bool>(context,
+        MaterialPageRoute(builder: (_) => CreateWorkItemScreen(isEc: isEc)));
+    if (created == true && context.mounted) {
+      setState(() => _ecPage = 1);
+      ref.invalidate(ecProgressProvider(1));
+      ref.invalidate(_dashboardInboxProvider);
+      ref.read(taskNotifierProvider.notifier).loadTasks();
+      ref.read(dashboardTasksProvider(_period).notifier).loadTasks();
+      ref.read(inboxNotifierProvider.notifier).loadInbox();
+    }
   }
 
-  Widget _buildGreetingSection(String name) {
+  Widget _buildReferenceHeader(String name) {
     final hour = DateTime.now().hour;
-    final timeGreeting = hour < 11
+    final greeting = hour < 11
         ? 'Good Morning'
         : hour < 15
             ? 'Good Afternoon'
             : hour < 18
                 ? 'Good Evening'
                 : 'Good Night';
-
-    return Stack(
-      children: [
-        Positioned(
-          right: 0,
-          top: -4,
-          child: SizedBox(
-            width: 110,
-            height: 60,
-            child: Stack(
-              children: [
-                Positioned(
-                  right: 20,
-                  top: 0,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [
-                          OrbitColors.sunAmber.withOpacity(0.9),
-                          OrbitColors.brandOrangeLight.withOpacity(0.5),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  left: 0,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      height: 30,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            const Color(0xFFE2E8F0).withOpacity(0.4),
-                            OrbitColors.scaffoldBackground,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$timeGreeting, $name',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: OrbitColors.textNavy,
-                letterSpacing: -0.4,
-              ),
-            ),
-            const SizedBox(height: 2),
-            const Text(
-              'Operational & Productivity Dashboard',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: OrbitColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 46,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: OrbitColors.cardSurface,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: OrbitColors.cardBorder),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x06000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.search,
-                    color: OrbitColors.textMuted, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Search tasks, inbox & records',
-                      hintStyle: TextStyle(
-                        fontSize: 13,
-                        color: OrbitColors.textMuted,
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
-                    onSubmitted: (val) {
-                      widget.onOpenSearch();
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
+    final photo = ref.watch(authProvider).user?.profilePhotoUrl;
+    Widget action(IconData icon, String label, VoidCallback onTap,
+            {bool badge = false}) =>
+        IconButton(
+          tooltip: label,
+          onPressed: onTap,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
+          icon: Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: .08),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: .25))),
+              child: Badge(
+                  isLabelVisible: badge,
+                  backgroundColor: OrbitColors.kpiRed,
+                  child: Center(
+                      child: Icon(icon, size: 18, color: Colors.white)))),
+        );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
         Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: OrbitColors.cardSurface,
-            shape: BoxShape.circle,
-            border: Border.all(color: OrbitColors.cardBorder),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x06000000),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.person_add_alt_1_outlined,
-                color: OrbitColors.textNavy, size: 20),
-            onPressed: widget.onOpenCheckIn,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAttendanceCard() {
-    final statusText = _isClockedIn && _clockInTime != null
-        ? 'Clocked in ${DateFormat('HH:mm').format(_clockInTime!)}'
-        : 'Tap navigation arrow to clock in';
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: OrbitColors.cardBorder),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              color: OrbitColors.coralIconBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.storefront_rounded,
-              color: OrbitColors.coralIcon,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Primarasa Food Industri',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: OrbitColors.textNavy,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: _isClockedIn
-                        ? OrbitColors.kpiGreen
-                        : OrbitColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isClockedIn = !_isClockedIn;
-                if (_isClockedIn) {
-                  _clockInTime = DateTime.now();
-                }
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(_isClockedIn
-                      ? 'Clocked in successfully!'
-                      : 'Clocked out.'),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                color: OrbitColors.scaffoldBackground,
                 shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _isClockedIn
-                    ? Icons.check_circle_rounded
-                    : Icons.navigation_rounded,
-                color:
-                    _isClockedIn ? OrbitColors.kpiGreen : OrbitColors.textNavy,
-                size: 20,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+                gradient: const LinearGradient(colors: [
+                  OrbitColors.bubbleBlueBorder,
+                  OrbitColors.primaryNavy
+                ]),
+                border: Border.all(
+                    color: Colors.white.withValues(alpha: .5), width: 2),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x3306244D), blurRadius: 8)
+                ]),
+            child: const Icon(Icons.radio_button_checked,
+                size: 24, color: Colors.white)),
+        const SizedBox(width: 8),
+        const Expanded(
+            child: Text('Orbit\nWorkHub',
+                style: TextStyle(
+                    fontSize: 15,
+                    height: 1.05,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white))),
+        action(Icons.search_rounded, 'Search workspace', widget.onOpenSearch),
+        action(Icons.notifications_none_rounded, 'Notifications',
+            widget.onOpenNotifications,
+            badge: (ref
+                        .watch(_dashboardInboxProvider)
+                        .valueOrNull
+                        ?.incompleteUnreadCount ??
+                    0) >
+                0),
+        action(Icons.grid_view_rounded, 'ERP workspace',
+            widget.onOpenErp ?? widget.onOpenNotifications),
+        IconButton(
+            tooltip: 'My profile',
+            onPressed: widget.onOpenProfile ?? widget.onOpenCheckIn,
+            padding: const EdgeInsets.only(left: 5),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
+            icon: CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.white,
+                child: ClipOval(
+                    child: photo == null || photo.isEmpty
+                        ? Text(name.isEmpty ? 'U' : name[0].toUpperCase(),
+                            style: const TextStyle(
+                                color: OrbitColors.primaryNavy,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700))
+                        : Image.network(photo,
+                            width: 30,
+                            height: 30,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person_outline,
+                                color: OrbitColors.primaryNavy))))),
+      ]),
+      const SizedBox(height: 12),
+      Row(children: [
+        Flexible(
+            child: Text('$greeting, $name',
+                style: const TextStyle(
+                    fontSize: 20,
+                    height: 1.15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white))),
+        const SizedBox(width: 5),
+        const Icon(Icons.waving_hand_rounded,
+            size: 22, color: OrbitColors.brandOrangeLight),
+      ]),
+      const SizedBox(height: 5),
+      const Text('Unified Workspace for Tasks, Chat, Projects & ERP',
+          style: TextStyle(fontSize: 11, height: 1.25, color: Colors.white)),
+    ]);
   }
 
-  Widget _buildDateStrip() {
-    final nowFormatted = DateFormat('EEEE, d MMMM yyyy').format(DateTime.now());
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: OrbitColors.cardBorder),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: OrbitColors.primaryNavy,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.calendar_today_rounded,
-                size: 14, color: Colors.white),
-          ),
-          const SizedBox(width: 8),
-          const Icon(Icons.event_note_rounded,
-              size: 16, color: OrbitColors.textMuted),
-          const SizedBox(width: 8),
-          const Icon(Icons.dashboard_outlined,
-              size: 16, color: OrbitColors.textMuted),
-          const SizedBox(width: 8),
-          const Icon(Icons.tune_rounded,
-              size: 16, color: OrbitColors.textMuted),
-          const Spacer(),
-          Flexible(
-              child: Text(
-            nowFormatted,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: OrbitColors.textSecondary,
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScoreAndPerformanceRow(
-      TaskListState taskState, InboxListState inboxState) {
-    final activeCount = taskState.total;
-    final taskCountUnavailable = taskState.error != null ||
-        (taskState.isLoading && taskState.tasks.isEmpty);
-    final performance = ref.watch(_performanceProvider);
-    final inboxCountUnavailable = !performance.hasValue;
-    final totalInbox = performance.valueOrNull?['earned_points'] ?? 0;
-
-    return Row(
-      children: [
-        // Left Card: Assigned Tasks (Navy Gradient)
+  Widget _buildPeriodPicker() => Row(children: [
         Expanded(
-          child: Container(
-            height: 130,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  OrbitColors.primaryNavy,
-                  Color(0xFF0F3A73),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A06244D),
-                  blurRadius: 10,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.assignment_turned_in_outlined,
-                            size: 15, color: Colors.white70),
-                        SizedBox(width: 4),
-                        Expanded(
-                            child: Text(
-                          'Assigned Tasks',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        )),
-                      ],
-                    ),
-                    const Spacer(),
-                    Text(
-                      taskCountUnavailable ? '—' : '$activeCount',
-                      style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: -0.5,
+            flex: 3,
+            child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(99),
+                    color: OrbitColors.primaryNavy.withValues(alpha: .3),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: .35))),
+                child: Row(children: [
+                  for (final period in DashboardPeriod.values)
+                    Expanded(
+                        child: Semantics(
+                      selected: _period == period,
+                      button: true,
+                      child: InkWell(
+                        onTap: () {
+                          if (period == _period) return;
+                          setState(() => _period = period);
+                        },
+                        borderRadius: BorderRadius.circular(99),
+                        child: AnimatedContainer(
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : const Duration(milliseconds: 220),
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                                color: _period == period
+                                    ? OrbitColors.cardSurface
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(99)),
+                            child: Text(period.label,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: _period == period
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                    color: _period == period
+                                        ? OrbitColors.textPrimary
+                                        : Colors.white))),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      taskCountUnavailable
-                          ? (taskState.error != null
-                              ? 'Unable to load tasks'
-                              : 'Loading tasks…')
-                          : activeCount == 0
-                              ? 'No assigned tasks'
-                              : '$activeCount assigned tasks',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Container(width: 4, height: 16, color: Colors.white24),
-                      const SizedBox(width: 2),
-                      Container(width: 4, height: 26, color: Colors.white38),
-                      const SizedBox(width: 2),
-                      Container(width: 4, height: 38, color: Colors.white54),
-                      const SizedBox(width: 2),
-                      Container(width: 4, height: 48, color: Colors.white),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+                    )),
+                ]))),
         const SizedBox(width: 12),
-
-        // Right Card: Pending Inbox & Approvals (Cream Tint)
         Expanded(
-          child: Container(
-            height: 130,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: OrbitColors.creamCard,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: OrbitColors.creamBorder),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Performance',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: OrbitColors.textNavy,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      width: 58,
-                      height: 58,
-                      child: const SizedBox.shrink(),
-                    ),
-                    Column(
-                      children: [
-                        Text(
-                          inboxCountUnavailable ? '—' : '$totalInbox',
+            flex: 2,
+            child: Row(children: [
+              const Icon(Icons.calendar_today_outlined,
+                  size: 16, color: Colors.white),
+              const SizedBox(width: 5),
+              Expanded(
+                  child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                          DateFormat('EEE, dd MMM yyyy').format(DateTime.now()),
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: OrbitColors.textNavy,
-                          ),
-                        ),
-                        Text(
-                          performance.hasError
-                              ? 'Unavailable'
-                              : 'Tasks ${performance.valueOrNull?['task_points'] ?? '—'} · EC ${performance.valueOrNull?['ec_points'] ?? '—'}',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w500,
-                            color: OrbitColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const Spacer(),
-              ],
-            ),
-          ),
-        ),
+                              fontSize: 11, color: Colors.white)))),
+            ])),
+      ]);
+
+  Widget _buildReferenceMetrics(
+      TaskListState taskState, InboxFetchResult? inbox) {
+    final stats = ref.watch(dashboardTaskStatsProvider(_period));
+    final performance = ref.watch(_performanceProvider);
+    final unavailable = taskState.error != null || !stats.hasValue;
+    final total = stats.valueOrNull?.total;
+    final open = stats.valueOrNull?.open;
+    final unread = inbox?.incompleteUnreadCount;
+    final metrics = <Widget>[
+      DashboardMetric(
+          title: 'Total Tasks',
+          value: unavailable ? '—' : '$total',
+          caption: taskState.error != null || stats.hasError
+              ? 'Unable to load tasks'
+              : total == null
+                  ? 'Loading tasks…'
+                  : '$total assigned tasks',
+          icon: Icons.assignment_outlined,
+          accent: OrbitColors.royalBlue,
+          waveColor: const Color(0xFF6366F1),
+          tint: OrbitColors.bubbleBlue,
+          wave: true,
+          onTap: _openTasks),
+      DashboardMetric(
+          title: 'Open Tasks',
+          value: open == null || total == null ? '—' : '$open / $total',
+          caption: stats.hasError
+              ? 'Status totals unavailable. Tap to retry.'
+              : total == null || open == null
+                  ? 'Loading status totals…'
+                  : '${total == 0 ? 0 : (open * 100 / total).round()}% of selected period',
+          icon: Icons.check_circle_outline,
+          accent: OrbitColors.kpiGreen,
+          tint: OrbitColors.kpiGreenBg,
+          progress: open == null || total == null
+              ? null
+              : total == 0
+                  ? 0
+                  : open / total,
+          onTap: stats.hasError
+              ? () => ref.invalidate(dashboardTaskStatsProvider(_period))
+              : _openTasks),
+      DashboardMetric(
+          title: 'Unread Inbox',
+          value: unread == null ? '—' : '$unread',
+          caption: unread == null
+              ? 'Unread total unavailable'
+              : 'Unread pending items',
+          icon: Icons.mail_outline,
+          accent: OrbitColors.kpiRed,
+          waveColor: OrbitColors.pinkWave,
+          tint: OrbitColors.pinkCardBg,
+          wave: true,
+          onTap: widget.onOpenNotifications),
+      DashboardMetric(
+          title: 'Total Points',
+          value: performance.hasValue
+              ? '${performance.valueOrNull?['earned_points'] ?? 0} pts'
+              : '—',
+          caption: performance.hasValue
+              ? 'Tasks ${performance.valueOrNull?['task_points'] ?? '—'} · EC ${performance.valueOrNull?['ec_points'] ?? '—'}'
+              : 'Points unavailable',
+          icon: Icons.toll_outlined,
+          accent: OrbitColors.brandOrange,
+          tint: OrbitColors.creamCard),
+    ];
+    return Column(children: [
+      for (var row = 0; row < 2; row++) ...[
+        if (row > 0) const SizedBox(height: 8),
+        IntrinsicHeight(
+            child:
+                Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(child: metrics[row * 2]),
+          const SizedBox(width: 8),
+          Expanded(child: metrics[row * 2 + 1]),
+        ])),
       ],
-    );
+    ]);
+  }
+
+  Widget _taskHeader() => Row(children: [
+        Expanded(
+            child: Text('My Tasks (${_period.label})',
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: OrbitColors.textPrimary))),
+        TextButton.icon(
+            onPressed: _openTasks,
+            style: TextButton.styleFrom(
+                minimumSize: const Size(0, 28),
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            label: const Text('View All', style: TextStyle(fontSize: 11)),
+            icon: const Icon(Icons.arrow_forward, size: 15),
+            iconAlignment: IconAlignment.end),
+        SizedBox(
+            width: 28,
+            height: 28,
+            child: PopupMenuButton<String>(
+              tooltip: 'Task options',
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              onSelected: (value) {
+                if (value == 'field') {
+                  widget.onOpenCheckIn();
+                } else if (value == 'ec') {
+                  setState(() => _showEc = true);
+                } else {
+                  _showCreateMenu();
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                    value: 'create', child: Text('Create task or EC')),
+                PopupMenuItem(value: 'ec', child: Text('EC')),
+                PopupMenuItem(value: 'field', child: Text('Field actions'))
+              ],
+            )),
+      ]);
+
+  String _dueLabel(String value) {
+    final date = DateTime.tryParse(value);
+    if (date == null) return value;
+    final now = DateTime.now();
+    return date.year == now.year &&
+            date.month == now.month &&
+            date.day == now.day
+        ? 'Today'
+        : DateFormat('dd MMM').format(date);
   }
 
   Widget _buildActiveTasksSection(TaskListState taskState) {
     final tasks = taskState.tasks;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return DashboardSurface(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-                child: Row(
-              children: [
-                const Icon(Icons.task_alt_rounded,
-                    size: 17, color: OrbitColors.textNavy),
-                const SizedBox(width: 6),
-                const Text(
-                  'My Tasks',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: OrbitColors.textNavy,
-                  ),
+            _taskHeader(),
+            const SizedBox(height: 6),
+            if (taskState.error != null)
+              TextButton(
+                onPressed: _refreshTasks,
+                child: const Text('Unable to load tasks. Tap to retry.'),
+              )
+            else if (tasks.isEmpty && !taskState.isLoading)
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: OrbitColors.cardSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: OrbitColors.cardBorder),
                 ),
-                const SizedBox(width: 6),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                  decoration: BoxDecoration(
-                    color: OrbitColors.primaryNavy.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '${taskState.total}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: OrbitColors.primaryNavy,
+                child: Column(
+                  children: [
+                    const Icon(Icons.assignment_outlined,
+                        size: 36, color: OrbitColors.textMuted),
+                    const SizedBox(height: 8),
+                    Text(
+                      taskState.total > 0
+                          ? 'No tasks loaded'
+                          : 'No assigned tasks right now',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: OrbitColors.textNavy,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      taskState.total > 0
+                          ? 'Refresh to load assigned tasks.'
+                          : 'Tasks assigned to you will automatically appear here.',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: OrbitColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-              ],
-            )),
-            if (taskState.isLoading)
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: OrbitColors.primaryNavy),
-              ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        if (taskState.error != null)
-          TextButton(
-            onPressed: _refreshTasks,
-            child: const Text('Unable to load tasks. Tap to retry.'),
-          )
-        else if (tasks.isEmpty && !taskState.isLoading)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-            decoration: BoxDecoration(
-              color: OrbitColors.cardSurface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: OrbitColors.cardBorder),
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.assignment_outlined,
-                    size: 36, color: OrbitColors.textMuted),
-                const SizedBox(height: 8),
-                Text(
-                  taskState.total > 0
-                      ? 'No tasks loaded'
-                      : 'No assigned tasks right now',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: OrbitColors.textNavy,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  taskState.total > 0
-                      ? 'Refresh to load assigned tasks.'
-                      : 'Tasks assigned to you will automatically appear here.',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: OrbitColors.textSecondary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          )
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: tasks.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final task = tasks[index];
-              final actionLabel = task.rowAction == 'request_review'
-                  ? 'Request review'
-                  : 'Complete';
-              final unavailableReason = task.status == 'completed'
-                  ? 'Completed'
-                  : task.status == 'cancelled'
-                      ? 'Cancelled'
-                      : task.status == 'pending_review' || task.hasPendingReview
-                          ? 'Review already requested'
-                          : 'Completion is unavailable for your role or this task state';
-              return Container(
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Tooltip(
-                          message: task.rowAction == null
-                              ? unavailableReason
-                              : '$actionLabel ${task.title}',
-                          child: Semantics(
-                              label: task.rowAction == null
-                                  ? '$unavailableReason: ${task.title}'
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: tasks.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final task = tasks[index];
+                  final actionLabel = task.rowAction == 'request_review'
+                      ? 'Request review'
+                      : 'Complete';
+                  final unavailableReason = task.status == 'completed'
+                      ? 'Completed'
+                      : task.status == 'cancelled'
+                          ? 'Cancelled'
+                          : task.status == 'pending_review' ||
+                                  task.hasPendingReview
+                              ? 'Review already requested'
+                              : 'Completion is unavailable for your role or this task state';
+                  return Container(
+                    color: OrbitColors.cardSurface,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                    child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Tooltip(
+                              message: task.rowAction == null
+                                  ? unavailableReason
                                   : '$actionLabel ${task.title}',
-                              child: Checkbox(
-                                value: task.status == 'completed',
-                                onChanged: task.rowAction == null ||
-                                        _pendingTaskActions.contains(task.id) ||
-                                        _uncertainTaskActions.contains(task.id)
-                                    ? null
-                                    : (value) {
-                                        if (value == true)
-                                          _performTaskAction(task);
-                                      },
-                              ))),
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            if (task.projectName != null &&
-                                task.projectName!.isNotEmpty)
-                              Text(task.projectName!,
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      color: OrbitColors.textSecondary,
-                                      fontWeight: FontWeight.w600)),
-                            InkWell(
-                              onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          TaskDetailScreen(taskId: task.id))),
-                              child: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 4),
-                                  child: Text(task.title,
-                                      style: TextStyle(
-                                          fontSize: 14,
-                                          color: OrbitColors.textNavy,
-                                          decoration: task.status == 'completed'
-                                              ? TextDecoration.lineThrough
-                                              : null))),
-                            ),
-                            Wrap(spacing: 4, runSpacing: 4, children: [
-                              if (task.status == 'pending_review' ||
-                                  task.hasPendingReview)
-                                const Chip(
-                                    label: Text('Pending review'),
-                                    visualDensity: VisualDensity.compact),
-                            ]),
-                          ])),
-                    ]),
-              );
-            },
-          ),
-        if (taskState.page < taskState.lastPage && taskState.error == null)
-          Center(
-              child: TextButton(
-            onPressed: taskState.isLoadingMore
-                ? null
-                : () => ref.read(taskNotifierProvider.notifier).loadMore(),
-            child: Text(taskState.isLoadingMore
-                ? 'Loading…'
-                : taskState.loadMoreError != null
-                    ? 'Unable to load more. Retry'
-                    : 'Load more tasks'),
-          )),
-      ],
-    );
+                              child: Semantics(
+                                  label: task.rowAction == null
+                                      ? '$unavailableReason: ${task.title}'
+                                      : '$actionLabel ${task.title}',
+                                  child: Checkbox(
+                                    visualDensity: VisualDensity.compact,
+                                    value: task.status == 'completed',
+                                    onChanged: task.rowAction == null ||
+                                            _pendingTaskActions
+                                                .contains(task.id) ||
+                                            _uncertainTaskActions
+                                                .contains(task.id)
+                                        ? null
+                                        : (value) {
+                                            if (value == true)
+                                              _performTaskAction(task);
+                                          },
+                                  ))),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                if (task.projectName != null &&
+                                    task.projectName!.isNotEmpty)
+                                  Text(task.projectName!,
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: OrbitColors.textSecondary,
+                                          fontWeight: FontWeight.w600)),
+                                InkWell(
+                                  onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (_) => TaskDetailScreen(
+                                              taskId: task.id))),
+                                  child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 2),
+                                      child: Text(task.title,
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              height: 1.1,
+                                              fontWeight: FontWeight.w500,
+                                              color: OrbitColors.textNavy,
+                                              decoration: task.status ==
+                                                      'completed'
+                                                  ? TextDecoration.lineThrough
+                                                  : null))),
+                                ),
+                                Wrap(spacing: 10, runSpacing: 4, children: [
+                                  if (task.assignees.isNotEmpty)
+                                    Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.person_outline,
+                                              size: 13,
+                                              color: OrbitColors.textSecondary),
+                                          const SizedBox(width: 3),
+                                          Flexible(
+                                              child: Text(task.assignees.first,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                      fontSize: 10,
+                                                      color: OrbitColors
+                                                          .textSecondary))),
+                                        ]),
+                                  if (task.dueDate.isNotEmpty)
+                                    Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                              Icons.calendar_today_outlined,
+                                              size: 12,
+                                              color: OrbitColors.textSecondary),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                              child: Text(
+                                                  _dueLabel(task.dueDate),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                      fontSize: 10,
+                                                      color: OrbitColors
+                                                          .textSecondary))),
+                                        ]),
+                                ]),
+                                Wrap(spacing: 4, runSpacing: 4, children: [
+                                  if (task.status == 'pending_review' ||
+                                      task.hasPendingReview)
+                                    const Chip(
+                                        label: Text('Pending review'),
+                                        visualDensity: VisualDensity.compact),
+                                ]),
+                              ])),
+                          const SizedBox(width: 6),
+                          Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                  color: task.priority.toLowerCase() == 'high'
+                                      ? OrbitColors.kpiRedBg
+                                      : OrbitColors.creamCard,
+                                  borderRadius: BorderRadius.circular(99)),
+                              child: Text(
+                                  task.priority.isEmpty
+                                      ? 'Medium'
+                                      : task.priority[0].toUpperCase() +
+                                          task.priority.substring(1),
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          task.priority.toLowerCase() == 'high'
+                                              ? OrbitColors.kpiRed
+                                              : OrbitColors.brandOrange))),
+                        ]),
+                  );
+                },
+              ),
+            if (taskState.page < taskState.lastPage && taskState.error == null)
+              Center(
+                  child: TextButton(
+                onPressed: taskState.isLoadingMore
+                    ? null
+                    : () => ref
+                        .read(dashboardTasksProvider(_period).notifier)
+                        .loadMore(),
+                child: Text(taskState.isLoadingMore
+                    ? 'Loading…'
+                    : taskState.loadMoreError != null
+                        ? 'Unable to load more. Retry'
+                        : 'Load more tasks'),
+              )),
+          ],
+        ));
   }
 
   Widget _buildPendingInboxSection(InboxListState inboxState) {
@@ -1145,7 +1006,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                   decoration: BoxDecoration(
-                    color: OrbitColors.brandOrange.withOpacity(0.12),
+                    color: OrbitColors.brandOrange.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(

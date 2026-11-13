@@ -26,38 +26,76 @@ class InboxRepository {
 
   InboxRepository(this._apiClient);
 
-  Future<InboxFetchResult> fetchTodos({String status = 'pending', String search = ''}) async {
+  Future<InboxFetchResult> fetchTodos(
+      {String status = 'pending', String search = ''}) async {
     try {
       final view = status == 'complete' ? 'complete' : 'incomplete';
-      final response = await _apiClient.dio.get('/inbox/api/todos', queryParameters: {'view': view, if (search.isNotEmpty) 'search': search});
+      final response = await _apiClient.dio.get('/inbox/api/todos',
+          queryParameters: {
+            'view': view,
+            if (search.isNotEmpty) 'search': search
+          });
       if (response.data is Map) {
-        final raw = response.data['tasks'] ?? response.data[view] ?? response.data['data'];
+        final raw = response.data['tasks'] ??
+            response.data[view] ??
+            response.data['data'];
         if (raw is List) {
           final data = response.data as Map;
           List<InboxItemModel> parse(Object? rows) => rows is List
-              ? rows.map((row) => InboxItemModel.fromJson(Map<String, dynamic>.from(row as Map))).toList()
+              ? rows
+                  .map((row) => InboxItemModel.fromJson(
+                      Map<String, dynamic>.from(row as Map)))
+                  .toList()
               : [];
           final current = parse(raw);
-          final incomplete = data['incomplete'] is List ? parse(data['incomplete']) : (view == 'incomplete' ? current : <InboxItemModel>[]);
-          final complete = data['complete'] is List ? parse(data['complete']) : (view == 'complete' ? current : <InboxItemModel>[]);
+          final incomplete = data['incomplete'] is List
+              ? parse(data['incomplete'])
+              : (view == 'incomplete' ? current : <InboxItemModel>[]);
+          final complete = data['complete'] is List
+              ? parse(data['complete'])
+              : (view == 'complete' ? current : <InboxItemModel>[]);
           final allItems = [...incomplete, ...complete];
           return InboxFetchResult(
             items: current,
             incompleteCount: (data['incomplete_count'] as num?)?.toInt(),
             completeCount: (data['complete_count'] as num?)?.toInt(),
-            incompleteUnreadCount: data['incomplete'] is List ? incomplete.where((item) => item.isUnread).length : null,
-            completeUnreadCount: data['complete'] is List ? complete.where((item) => item.isUnread).length : null,
-            sources: {for (final item in allItems) item.filterSource: item.filterSourceLabel},
-            sourceCounts: data['incomplete'] is List && data['complete'] is List ? {
-              for (final source in allItems.map((item) => item.filterSource).toSet()) source: [
-                incomplete.where((item) => item.filterSource == source).length,
-                complete.where((item) => item.filterSource == source).length,
-                incomplete.where((item) => item.filterSource == source && item.isUnread).length,
-                complete.where((item) => item.filterSource == source && item.isUnread).length,
-              ],
-            } : const {},
-            sourceCountsComplete: data['incomplete'] is List && data['complete'] is List,
-            guestActions: data['guest_actions'] is Map ? Map<String, dynamic>.from(data['guest_actions'] as Map) : const {},
+            incompleteUnreadCount: data['incomplete'] is List
+                ? incomplete.where((item) => item.isUnread).length
+                : null,
+            completeUnreadCount: data['complete'] is List
+                ? complete.where((item) => item.isUnread).length
+                : null,
+            sources: {
+              for (final item in allItems)
+                item.filterSource: item.filterSourceLabel
+            },
+            sourceCounts: data['incomplete'] is List && data['complete'] is List
+                ? {
+                    for (final source
+                        in allItems.map((item) => item.filterSource).toSet())
+                      source: [
+                        incomplete
+                            .where((item) => item.filterSource == source)
+                            .length,
+                        complete
+                            .where((item) => item.filterSource == source)
+                            .length,
+                        incomplete
+                            .where((item) =>
+                                item.filterSource == source && item.isUnread)
+                            .length,
+                        complete
+                            .where((item) =>
+                                item.filterSource == source && item.isUnread)
+                            .length,
+                      ],
+                  }
+                : const {},
+            sourceCountsComplete:
+                data['incomplete'] is List && data['complete'] is List,
+            guestActions: data['guest_actions'] is Map
+                ? Map<String, dynamic>.from(data['guest_actions'] as Map)
+                : const {},
             canCompleteComment: data['can_complete_comment'] == true,
           );
         }
@@ -68,10 +106,17 @@ class InboxRepository {
     }
   }
 
-  Future<bool> markRead(String module, String subjectKey, {String? readSubjectType, String? readSubjectKey}) async {
+  Future<bool> markRead(String module, String subjectKey,
+      {String? readSubjectType, String? readSubjectKey}) async {
     try {
-      final response = await _apiClient.dio.post('/inbox/api/${Uri.encodeComponent(module)}/${Uri.encodeComponent(subjectKey)}/mark-read',
-          data: readSubjectType != null && readSubjectKey != null ? {'read_subject_type': readSubjectType, 'read_subject_key': readSubjectKey} : null);
+      final response = await _apiClient.dio.post(
+          '/inbox/api/${Uri.encodeComponent(module)}/${Uri.encodeComponent(subjectKey)}/mark-read',
+          data: readSubjectType != null && readSubjectKey != null
+              ? {
+                  'read_subject_type': readSubjectType,
+                  'read_subject_key': readSubjectKey
+                }
+              : null);
       return response.statusCode == 200;
     } catch (_) {
       return false;
@@ -79,12 +124,15 @@ class InboxRepository {
   }
 
   Future<void> markMentionNotificationsRead(List<int> ids) async {
-    await Future.wait(ids.toSet().map((id) => _apiClient.dio.post('/inbox/api/notifications/$id/read')));
+    await Future.wait(ids
+        .toSet()
+        .map((id) => _apiClient.dio.post('/inbox/api/notifications/$id/read')));
   }
 
   Future<bool> completeTodo(String module, String subjectKey) async {
     try {
-      final response = await _apiClient.dio.post('/inbox/api/$module/$subjectKey/complete');
+      final response =
+          await _apiClient.dio.post('/inbox/api/$module/$subjectKey/complete');
       return response.statusCode == 200;
     } catch (_) {
       return false;
@@ -103,8 +151,17 @@ class InboxFetchResult {
   final Map<String, String> sources;
   final Map<String, List<int>> sourceCounts;
   final bool sourceCountsComplete;
-  InboxFetchResult({required this.items, this.incompleteCount, this.completeCount, this.guestActions = const {}, this.canCompleteComment = false,
-    this.incompleteUnreadCount, this.completeUnreadCount, this.sources = const {}, this.sourceCounts = const {}, this.sourceCountsComplete = false});
+  InboxFetchResult(
+      {required this.items,
+      this.incompleteCount,
+      this.completeCount,
+      this.guestActions = const {},
+      this.canCompleteComment = false,
+      this.incompleteUnreadCount,
+      this.completeUnreadCount,
+      this.sources = const {},
+      this.sourceCounts = const {},
+      this.sourceCountsComplete = false});
 }
 
 class InboxListState {
@@ -167,7 +224,8 @@ class InboxListState {
       completeCount: completeCount ?? this.completeCount,
       guestActions: guestActions ?? this.guestActions,
       canCompleteComment: canCompleteComment ?? this.canCompleteComment,
-      incompleteUnreadCount: incompleteUnreadCount ?? this.incompleteUnreadCount,
+      incompleteUnreadCount:
+          incompleteUnreadCount ?? this.incompleteUnreadCount,
       completeUnreadCount: completeUnreadCount ?? this.completeUnreadCount,
       sources: sources ?? this.sources,
       sourceCounts: sourceCounts ?? this.sourceCounts,
@@ -189,7 +247,8 @@ class InboxNotifier extends StateNotifier<InboxListState> {
   int _requestNumber = 0;
   final List<void Function()> _cancelRealtimeSubscriptions = [];
 
-  InboxNotifier(this._repo, this._reverb, this._userId, [this._employeeChats]) : super(InboxListState()) {
+  InboxNotifier(this._repo, this._reverb, this._userId, [this._employeeChats])
+      : super(InboxListState()) {
     loadInbox();
     _setupRealtime();
   }
@@ -198,7 +257,12 @@ class InboxNotifier extends StateNotifier<InboxListState> {
     _status = status ?? _status;
     _search = search ?? _search;
     final requestNumber = ++_requestNumber;
-    state = state.copyWith(isLoading: true, error: null, chatError: null, status: _status, search: _search);
+    state = state.copyWith(
+        isLoading: true,
+        error: null,
+        chatError: null,
+        status: _status,
+        search: _search);
     try {
       final todos = await _repo.fetchTodos(status: _status, search: _search);
       if (!mounted || requestNumber != _requestNumber) return;
@@ -208,9 +272,12 @@ class InboxNotifier extends StateNotifier<InboxListState> {
         try {
           allChats = (await _employeeChats.fetchConversations())
               .map(_employeeChatInboxItem)
-              .where((item) => _search.isEmpty ||
+              .where((item) =>
+                  _search.isEmpty ||
                   item.title.toLowerCase().contains(_search.toLowerCase()) ||
-                  (item.subtitle ?? '').toLowerCase().contains(_search.toLowerCase()))
+                  (item.subtitle ?? '')
+                      .toLowerCase()
+                      .contains(_search.toLowerCase()))
               .toList();
         } catch (_) {
           chatError = 'Unable to load chats. Please try again.';
@@ -222,17 +289,22 @@ class InboxNotifier extends StateNotifier<InboxListState> {
       if (chatError == null) {
         sourceCounts['employee-chat'] = [allChats.length, 0, unreadChats, 0];
       }
-      final sources = <String, String>{...todos.sources, 'employee-chat': 'Chats'};
-      final visibleChats = _status == 'complete' ? const <InboxItemModel>[] : allChats;
+      final sources = <String, String>{
+        ...todos.sources,
+        'employee-chat': 'Chats'
+      };
+      final visibleChats =
+          _status == 'complete' ? const <InboxItemModel>[] : allChats;
       state = InboxListState(
         items: [...todos.items, ...visibleChats],
         incompleteCount: todos.incompleteCount == null || chatError != null
             ? todos.incompleteCount
             : todos.incompleteCount! + allChats.length,
         completeCount: todos.completeCount,
-        incompleteUnreadCount: todos.incompleteUnreadCount == null || chatError != null
-            ? todos.incompleteUnreadCount
-            : todos.incompleteUnreadCount! + unreadChats,
+        incompleteUnreadCount:
+            todos.incompleteUnreadCount == null || chatError != null
+                ? todos.incompleteUnreadCount
+                : todos.incompleteUnreadCount! + unreadChats,
         completeUnreadCount: todos.completeUnreadCount,
         sources: sources,
         sourceCounts: sourceCounts,
@@ -278,7 +350,8 @@ class InboxNotifier extends StateNotifier<InboxListState> {
 
   Future<bool> completeItem(InboxItemModel item) async {
     if (item.moduleCode != null && item.subjectKey != null) {
-      final completed = await _repo.completeTodo(item.moduleCode!, item.subjectKey!);
+      final completed =
+          await _repo.completeTodo(item.moduleCode!, item.subjectKey!);
       if (!completed) return false;
       await loadInbox();
       return true;
@@ -288,10 +361,12 @@ class InboxNotifier extends StateNotifier<InboxListState> {
 
   void _setupRealtime() {
     if (_userId != null) {
-      _cancelRealtimeSubscriptions.add(_reverb.subscribe('private-inbox.user.$_userId', (eventData) {
+      _cancelRealtimeSubscriptions
+          .add(_reverb.subscribe('private-inbox.user.$_userId', (eventData) {
         loadInbox();
       }));
-      _cancelRealtimeSubscriptions.add(_reverb.subscribe('private-App.Models.User.$_userId', (eventData) {
+      _cancelRealtimeSubscriptions.add(
+          _reverb.subscribe('private-App.Models.User.$_userId', (eventData) {
         loadInbox();
       }));
     }
@@ -306,7 +381,8 @@ class InboxNotifier extends StateNotifier<InboxListState> {
   }
 }
 
-final inboxNotifierProvider = StateNotifierProvider<InboxNotifier, InboxListState>((ref) {
+final inboxNotifierProvider =
+    StateNotifierProvider<InboxNotifier, InboxListState>((ref) {
   final repo = ref.watch(inboxRepositoryProvider);
   final reverb = ref.watch(reverbServiceProvider);
   final employeeChats = ref.watch(employeeChatRepositoryProvider);

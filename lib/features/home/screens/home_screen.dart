@@ -32,7 +32,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         elevation: 0,
         title: const Text(
           'WorkHub Orbit',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
         ),
         actions: [
           IconButton(
@@ -74,7 +75,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         : null,
                     child: user?.profilePhotoUrl == null
                         ? Text(
-                            user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
+                            user?.name.isNotEmpty == true
+                                ? user!.name[0].toUpperCase()
+                                : 'U',
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,

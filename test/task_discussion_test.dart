@@ -25,24 +25,53 @@ class _Adapter implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
   @override
-  Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
+  Future<ResponseBody> fetch(RequestOptions options,
+      Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
     requests.add(options);
     final older = options.queryParameters['before_id'] == 100;
-    final body = {'data': {
-      'subject': {'can_comment': canComment},
-      'comments': [{'comment_id': older && !repeatCursor ? 90 : 100, 'body': older && !repeatCursor ? 'Older note' : 'Recent note', 'author': {'name': 'Alex'}}],
-      'pagination': {'first_id': older && !repeatCursor ? 90 : 100, 'has_older': repeatCursor || !older},
-    }};
-    return ResponseBody.fromString(jsonEncode(body), options.method == 'POST' ? postStatus : failLoad ? 503 : 200, headers: {Headers.contentTypeHeader: [Headers.jsonContentType]});
+    final body = {
+      'data': {
+        'subject': {'can_comment': canComment},
+        'comments': [
+          {
+            'comment_id': older && !repeatCursor ? 90 : 100,
+            'body': older && !repeatCursor ? 'Older note' : 'Recent note',
+            'author': {'name': 'Alex'}
+          }
+        ],
+        'pagination': {
+          'first_id': older && !repeatCursor ? 90 : 100,
+          'has_older': repeatCursor || !older
+        },
+      }
+    };
+    return ResponseBody.fromString(
+        jsonEncode(body),
+        options.method == 'POST'
+            ? postStatus
+            : failLoad
+                ? 503
+                : 200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType]
+        });
   }
 }
 
 void main() {
-  testWidgets('discussion stops when an older page does not advance the cursor', (tester) async {
+  testWidgets('discussion stops when an older page does not advance the cursor',
+      (tester) async {
     final adapter = _Adapter()..repeatCursor = true;
-    final api = ApiClient(customDio: Dio()..httpClientAdapter = adapter, customStorage: _Storage());
-    await tester.pumpWidget(ProviderScope(overrides: [apiClientProvider.overrideWithValue(api)],
-      child: const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: InboxDiscussion(module: 'task', subjectKey: '12'))))));
+    final api = ApiClient(
+        customDio: Dio()..httpClientAdapter = adapter,
+        customStorage: _Storage());
+    await tester.pumpWidget(ProviderScope(
+        overrides: [apiClientProvider.overrideWithValue(api)],
+        child: const MaterialApp(
+            home: Scaffold(
+                body: SingleChildScrollView(
+                    child:
+                        InboxDiscussion(module: 'task', subjectKey: '12'))))));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Load older comments'));
     await tester.pumpAndSettle();
@@ -51,27 +80,47 @@ void main() {
   });
 
   testWidgets('a rejected comment shows an actionable error', (tester) async {
-    final adapter = _Adapter()..canComment = true..postStatus = 403;
-    final api = ApiClient(customDio: Dio()..httpClientAdapter = adapter, customStorage: _Storage());
-    await tester.pumpWidget(ProviderScope(overrides: [apiClientProvider.overrideWithValue(api)],
-      child: const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: InboxDiscussion(module: 'task', subjectKey: '12'))))));
+    final adapter = _Adapter()
+      ..canComment = true
+      ..postStatus = 403;
+    final api = ApiClient(
+        customDio: Dio()..httpClientAdapter = adapter,
+        customStorage: _Storage());
+    await tester.pumpWidget(ProviderScope(
+        overrides: [apiClientProvider.overrideWithValue(api)],
+        child: const MaterialApp(
+            home: Scaffold(
+                body: SingleChildScrollView(
+                    child:
+                        InboxDiscussion(module: 'task', subjectKey: '12'))))));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Add a comment'), 'Hello');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Add a comment'), 'Hello');
     tester.testTextInput.hide();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Send'));
     await tester.pumpAndSettle();
-    expect(find.text('You do not have permission to add this comment.'), findsOneWidget);
+    expect(find.text('You do not have permission to add this comment.'),
+        findsOneWidget);
     expect(find.text('Refresh discussion'), findsNothing);
   });
 
-  testWidgets('failed discussion refresh keeps uncertain comment locked', (tester) async {
+  testWidgets('failed discussion refresh keeps uncertain comment locked',
+      (tester) async {
     final adapter = _Adapter()..canComment = true;
-    final api = ApiClient(customDio: Dio()..httpClientAdapter = adapter, customStorage: _Storage());
-    await tester.pumpWidget(ProviderScope(overrides: [apiClientProvider.overrideWithValue(api)],
-      child: const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: InboxDiscussion(module: 'task', subjectKey: '12'))))));
+    final api = ApiClient(
+        customDio: Dio()..httpClientAdapter = adapter,
+        customStorage: _Storage());
+    await tester.pumpWidget(ProviderScope(
+        overrides: [apiClientProvider.overrideWithValue(api)],
+        child: const MaterialApp(
+            home: Scaffold(
+                body: SingleChildScrollView(
+                    child:
+                        InboxDiscussion(module: 'task', subjectKey: '12'))))));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Add a comment'), 'Hello');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Add a comment'), 'Hello');
     tester.testTextInput.hide();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Send'));
@@ -79,26 +128,41 @@ void main() {
     adapter.failLoad = true;
     await tester.tap(find.text('Refresh discussion'));
     await tester.pumpAndSettle();
-    expect(find.text('Unable to load discussion. Tap to retry.'), findsOneWidget);
+    expect(
+        find.text('Unable to load discussion. Tap to retry.'), findsOneWidget);
     adapter.failLoad = false;
     await tester.tap(find.text('Unable to load discussion. Tap to retry.'));
     await tester.pumpAndSettle();
-    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Send')).onPressed, isNotNull);
-    expect(adapter.requests.where((request) => request.method == 'POST').length, 1);
+    expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Send'))
+            .onPressed,
+        isNotNull);
+    expect(adapter.requests.where((request) => request.method == 'POST').length,
+        1);
   });
 
-  testWidgets('task discussion uses WorkHub and loads older comments with a cursor', (tester) async {
+  testWidgets(
+      'task discussion uses WorkHub and loads older comments with a cursor',
+      (tester) async {
     final adapter = _Adapter();
-    final api = ApiClient(customDio: Dio()..httpClientAdapter = adapter, customStorage: _Storage());
+    final api = ApiClient(
+        customDio: Dio()..httpClientAdapter = adapter,
+        customStorage: _Storage());
     await tester.pumpWidget(ProviderScope(
       overrides: [apiClientProvider.overrideWithValue(api)],
-      child: const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: InboxDiscussion(module: 'task', subjectKey: '12')))),
+      child: const MaterialApp(
+          home: Scaffold(
+              body: SingleChildScrollView(
+                  child: InboxDiscussion(module: 'task', subjectKey: '12')))),
     ));
     await tester.pumpAndSettle();
     expect(find.text('Recent note'), findsOneWidget);
     expect(find.text('Add a comment'), findsNothing);
-    expect(find.text('You can view this discussion but cannot add comments.'), findsOneWidget);
-    expect(adapter.requests.first.uri.path, '/workhub/api/v1/collaboration/task/12/comments');
+    expect(find.text('You can view this discussion but cannot add comments.'),
+        findsOneWidget);
+    expect(adapter.requests.first.uri.path,
+        '/workhub/api/v1/collaboration/task/12/comments');
     await tester.tap(find.text('Load older comments'));
     await tester.pumpAndSettle();
     expect(find.text('Older note'), findsOneWidget);

@@ -24,7 +24,9 @@ class SecureStorageService {
     final customUrl = await _storage.read(key: ApiConstants.baseUrlKey);
     if (customUrl != null && customUrl.isNotEmpty) {
       // Strip trailing /api/v1 or trailing slashes so baseUrl is strictly the root host origin
-      var cleaned = customUrl.replaceAll(RegExp(r'/api/v1/?$'), '').replaceAll(RegExp(r'/+$'), '');
+      var cleaned = customUrl
+          .replaceAll(RegExp(r'/api/v1/?$'), '')
+          .replaceAll(RegExp(r'/+$'), '');
       if (cleaned.contains('10.11.2.49') || cleaned.contains('rosyad-erplab')) {
         cleaned = ApiConstants.defaultBaseUrl;
       }

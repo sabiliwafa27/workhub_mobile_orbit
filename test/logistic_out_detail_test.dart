@@ -21,25 +21,44 @@ class _Adapter implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
   @override
-  Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
+  Future<ResponseBody> fetch(RequestOptions options,
+      Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
     requests.add(options);
-    return ResponseBody.fromString(jsonEncode({'kind': 'warehouse', 'detail': {
-      'header': {'display_reference': 'PO-12', 'supplier': {'branch_name': 'Surabaya'}},
-      'items': [{'item_name': 'Product A', 'quantity': 5}],
-    }}), 200, headers: {Headers.contentTypeHeader: [Headers.jsonContentType]});
+    return ResponseBody.fromString(
+        jsonEncode({
+          'kind': 'warehouse',
+          'detail': {
+            'header': {
+              'display_reference': 'PO-12',
+              'supplier': {'branch_name': 'Surabaya'}
+            },
+            'items': [
+              {'item_name': 'Product A', 'quantity': 5}
+            ],
+          }
+        }),
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType]
+        });
   }
 }
 
 void main() {
-  testWidgets('Logistic Out detail requests the scoped Core endpoint', (tester) async {
+  testWidgets('Logistic Out detail requests the scoped Core endpoint',
+      (tester) async {
     final adapter = _Adapter();
-    final api = ApiClient(customDio: Dio()..httpClientAdapter = adapter, customStorage: _Storage());
+    final api = ApiClient(
+        customDio: Dio()..httpClientAdapter = adapter,
+        customStorage: _Storage());
     await tester.pumpWidget(ProviderScope(
       overrides: [apiClientProvider.overrideWithValue(api)],
-      child: const MaterialApp(home: LogisticOutDetailScreen(stage: 'warehouse', subjectId: 12)),
+      child: const MaterialApp(
+          home: LogisticOutDetailScreen(stage: 'warehouse', subjectId: 12)),
     ));
     await tester.pumpAndSettle();
-    expect(adapter.requests.single.uri.path, '/api/v1/inbox/logistic-out/warehouse/12');
+    expect(adapter.requests.single.uri.path,
+        '/api/v1/inbox/logistic-out/warehouse/12');
     expect(find.text('PO-12'), findsOneWidget);
     expect(find.text('Surabaya'), findsOneWidget);
     expect(find.text('Product A'), findsOneWidget);

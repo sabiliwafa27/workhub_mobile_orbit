@@ -62,12 +62,19 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
     if (shorebird != ShorebirdUpdateResult.unavailable) {
       final message = switch (shorebird) {
         ShorebirdUpdateResult.upToDate => 'You are using the latest version.',
-        ShorebirdUpdateResult.downloaded => 'Update downloaded. Close and reopen WorkHub to use it.',
-        ShorebirdUpdateResult.restartRequired => 'An update is ready. Close and reopen WorkHub to apply it.',
-        ShorebirdUpdateResult.failed => 'Unable to check or download the update. Please try again.',
+        ShorebirdUpdateResult.downloaded =>
+          'Update downloaded. Close and reopen WorkHub to use it.',
+        ShorebirdUpdateResult.restartRequired =>
+          'An update is ready. Close and reopen WorkHub to apply it.',
+        ShorebirdUpdateResult.failed =>
+          'Unable to check or download the update. Please try again.',
         ShorebirdUpdateResult.unavailable => '',
       };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: shorebird == ShorebirdUpdateResult.failed ? null : WhatsAppColors.tealGreen));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(message),
+          backgroundColor: shorebird == ShorebirdUpdateResult.failed
+              ? null
+              : WhatsAppColors.tealGreen));
       return;
     }
     final release = await updater.checkForUpdate();
@@ -97,7 +104,8 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
         backgroundColor: WhatsAppColors.cardBg,
         title: const Text(
           'My Profile',
-          style: TextStyle(color: WhatsAppColors.textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: WhatsAppColors.textPrimary, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -106,9 +114,12 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
             Center(
               child: CircleAvatar(
                 radius: 36,
-                backgroundColor: WhatsAppColors.tealGreen.withOpacity(0.2),
+                backgroundColor:
+                    WhatsAppColors.tealGreen.withValues(alpha: 0.2),
                 child: Text(
-                  user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
+                  user?.name.isNotEmpty == true
+                      ? user!.name[0].toUpperCase()
+                      : 'U',
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
@@ -154,7 +165,8 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close', style: TextStyle(color: WhatsAppColors.tealGreen)),
+            child: const Text('Close',
+                style: TextStyle(color: WhatsAppColors.tealGreen)),
           ),
         ],
       ),
@@ -236,11 +248,13 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
                 value: 'updates',
                 child: Row(
                   children: [
-                    Icon(Icons.system_update_rounded, color: WhatsAppColors.tealGreen, size: 20),
+                    Icon(Icons.system_update_rounded,
+                        color: WhatsAppColors.tealGreen, size: 20),
                     SizedBox(width: 12),
                     Text(
                       'Check for App Updates',
-                      style: TextStyle(color: WhatsAppColors.textPrimary, fontSize: 14),
+                      style: TextStyle(
+                          color: WhatsAppColors.textPrimary, fontSize: 14),
                     ),
                   ],
                 ),
@@ -249,11 +263,13 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
                 value: 'profile',
                 child: Row(
                   children: [
-                    Icon(Icons.person_outline, color: WhatsAppColors.textSecondary, size: 20),
+                    Icon(Icons.person_outline,
+                        color: WhatsAppColors.textSecondary, size: 20),
                     SizedBox(width: 12),
                     Text(
                       'My Profile',
-                      style: TextStyle(color: WhatsAppColors.textPrimary, fontSize: 14),
+                      style: TextStyle(
+                          color: WhatsAppColors.textPrimary, fontSize: 14),
                     ),
                   ],
                 ),
@@ -285,7 +301,7 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
           color: WhatsAppColors.background,
           border: Border(
             top: BorderSide(
-              color: WhatsAppColors.divider.withOpacity(0.5),
+              color: WhatsAppColors.divider.withValues(alpha: 0.5),
               width: 0.5,
             ),
           ),
@@ -293,8 +309,8 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
         child: NavigationBarTheme(
           data: NavigationBarThemeData(
             indicatorColor: WhatsAppColors.navIndicatorBg,
-            labelTextStyle: MaterialStateProperty.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) {
+            labelTextStyle: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
                 return const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -307,8 +323,8 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
                 color: WhatsAppColors.textSecondary,
               );
             }),
-            iconTheme: MaterialStateProperty.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) {
+            iconTheme: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
                 return const IconThemeData(
                   color: WhatsAppColors.navIndicatorIcon,
                   size: 24,

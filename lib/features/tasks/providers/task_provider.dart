@@ -243,12 +243,13 @@ class TaskNotifier extends StateNotifier<TaskListState> {
       String? search,
       String? priority,
       String? from,
-      String? to}) async {
+      String? to,
+      bool clearDateRange = false}) async {
     _status = status ?? _status;
     _search = search ?? _search;
     _priority = priority ?? _priority;
-    _from = from ?? _from;
-    _to = to ?? _to;
+    _from = clearDateRange ? null : from ?? _from;
+    _to = clearDateRange ? null : to ?? _to;
     final generation = ++_generation;
     state = state.copyWith(isLoading: true, isLoadingMore: false, error: null);
     try {

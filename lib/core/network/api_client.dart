@@ -40,7 +40,9 @@ class ApiClient {
               path = '/api/v1$path';
             } else if (path.startsWith('/inbox')) {
               // Normalize /inbox/api/todos or /inbox/todos -> /api/v1/inbox/todos
-              final clean = path.replaceFirst('/inbox/api', '').replaceFirst('/inbox', '');
+              final clean = path
+                  .replaceFirst('/inbox/api', '')
+                  .replaceFirst('/inbox', '');
               path = '/api/v1/inbox$clean';
             } else if (path.startsWith('/tasks') ||
                 path.startsWith('/projects') ||

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/orbit_theme.dart';
+import '../../../core/widgets/orbit_workspace.dart';
 import '../models/chat_item_model.dart';
 import '../providers/chat_provider.dart';
 
@@ -22,25 +23,21 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final chatState = ref.watch(chatNotifierProvider);
     final displayChats = chatState.chats;
 
-    return Scaffold(
-      backgroundColor: OrbitColors.scaffoldBackground,
+    return OrbitWorkspaceScaffold(
+      subtitle: 'Customer & team discussion threads',
+      headerIcon: Icons.chat_bubble_outline_rounded,
       appBar: AppBar(
-        title: const Text(
-          'Customer Discussions',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: OrbitColors.textNavy,
-          ),
-        ),
+        title: const Text('Customer Discussions'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: OrbitColors.textNavy),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             onPressed: () {
               ref.read(chatNotifierProvider.notifier).loadChats(
-                search: _searchController.text,
-                filter: _selectedFilter == 'All' ? null : _selectedFilter.toLowerCase(),
-              );
+                    search: _searchController.text,
+                    filter: _selectedFilter == 'All'
+                        ? null
+                        : _selectedFilter.toLowerCase(),
+                  );
             },
           ),
         ],
@@ -49,15 +46,18 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         color: OrbitColors.primaryNavy,
         onRefresh: () async {
           await ref.read(chatNotifierProvider.notifier).loadChats(
-            search: _searchController.text,
-            filter: _selectedFilter == 'All' ? null : _selectedFilter.toLowerCase(),
-          );
+                search: _searchController.text,
+                filter: _selectedFilter == 'All'
+                    ? null
+                    : _selectedFilter.toLowerCase(),
+              );
         },
         child: Column(
           children: [
             // Search Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Container(
                 height: 46,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -68,7 +68,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.search, color: OrbitColors.textMuted, size: 20),
+                    const Icon(Icons.search,
+                        color: OrbitColors.textMuted, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
@@ -76,9 +77,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         style: const TextStyle(fontSize: 14),
                         onChanged: (val) {
                           ref.read(chatNotifierProvider.notifier).loadChats(
-                            search: val,
-                            filter: _selectedFilter == 'All' ? null : _selectedFilter.toLowerCase(),
-                          );
+                                search: val,
+                                filter: _selectedFilter == 'All'
+                                    ? null
+                                    : _selectedFilter.toLowerCase(),
+                              );
                         },
                         decoration: const InputDecoration(
                           hintText: 'Search conversations...',
@@ -112,25 +115,34 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     onTap: () {
                       setState(() => _selectedFilter = filter);
                       ref.read(chatNotifierProvider.notifier).loadChats(
-                        search: _searchController.text,
-                        filter: filter == 'All' ? null : filter.toLowerCase(),
-                      );
+                            search: _searchController.text,
+                            filter:
+                                filter == 'All' ? null : filter.toLowerCase(),
+                          );
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isSelected ? OrbitColors.pillDark : OrbitColors.cardSurface,
+                        color: isSelected
+                            ? OrbitColors.pillDark
+                            : OrbitColors.cardSurface,
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: isSelected ? OrbitColors.pillDark : OrbitColors.cardBorder,
+                          color: isSelected
+                              ? OrbitColors.pillDark
+                              : OrbitColors.cardBorder,
                         ),
                       ),
                       child: Text(
                         filter,
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? Colors.white : OrbitColors.textSecondary,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected
+                              ? Colors.white
+                              : OrbitColors.textSecondary,
                         ),
                       ),
                     ),
@@ -144,14 +156,16 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             Expanded(
               child: chatState.isLoading
                   ? const Center(
-                      child: CircularProgressIndicator(color: OrbitColors.primaryNavy),
+                      child: CircularProgressIndicator(
+                          color: OrbitColors.primaryNavy),
                     )
                   : displayChats.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: const [
-                              Icon(Icons.chat_bubble_outline_rounded, size: 48, color: OrbitColors.textMuted),
+                              Icon(Icons.chat_bubble_outline_rounded,
+                                  size: 48, color: OrbitColors.textMuted),
                               SizedBox(height: 12),
                               Text(
                                 'No conversations found',
@@ -164,15 +178,19 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                               SizedBox(height: 4),
                               Text(
                                 'Customer and internal discussions will appear here.',
-                                style: TextStyle(fontSize: 12, color: OrbitColors.textSecondary),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: OrbitColors.textSecondary),
                               ),
                             ],
                           ),
                         )
                       : ListView.separated(
-                          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 90),
+                          padding: const EdgeInsets.only(
+                              left: 16, right: 16, bottom: 90),
                           itemCount: displayChats.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
                           itemBuilder: (context, index) {
                             final chat = displayChats[index];
                             return _buildChatItem(chat);
@@ -220,7 +238,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   ? OrbitColors.coralIconBg
                   : OrbitColors.bubbleBlue,
               child: chat.isGroup
-                  ? const Icon(Icons.group, color: OrbitColors.coralIcon, size: 22)
+                  ? const Icon(Icons.group,
+                      color: OrbitColors.coralIcon, size: 22)
                   : Text(
                       chat.title.isNotEmpty ? chat.title[0].toUpperCase() : 'C',
                       style: const TextStyle(
@@ -256,8 +275,12 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         chat.time,
                         style: TextStyle(
                           fontSize: 11,
-                          color: chat.unreadCount > 0 ? OrbitColors.brandOrange : OrbitColors.textMuted,
-                          fontWeight: chat.unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                          color: chat.unreadCount > 0
+                              ? OrbitColors.brandOrange
+                              : OrbitColors.textMuted,
+                          fontWeight: chat.unreadCount > 0
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -289,7 +312,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                       if (chat.unreadCount > 0) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: const BoxDecoration(
                             color: OrbitColors.accentCoral,
                             shape: BoxShape.circle,

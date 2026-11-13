@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'orbit_motion.dart';
 
 class OrbitColors {
   // Brand Header
@@ -6,6 +7,16 @@ class OrbitColors {
   static const Color primaryNavyDark = Color(0xFF031630);
   static const Color brandOrange = Color(0xFFD97706);
   static const Color brandOrangeLight = Color(0xFFF59E0B);
+
+  // Reference Image Palette Accents
+  static const Color royalBlue = Color(0xFF2563EB);
+  static const Color skyBlue = Color(0xFF60A5FA);
+  static const Color skyPillBg = Color(0xFFBAE6FD);
+  static const Color skyPillInk = Color(0xFF075985);
+  static const Color slatePillBg = Color(0xFFCBD5E1);
+  static const Color slatePillInk = Color(0xFF1E293B);
+  static const Color pinkCardBg = Color(0xFFFDF2F8);
+  static const Color pinkWave = Color(0xFFEC4899);
 
   // Background & Surfaces
   static const Color scaffoldBackground = Color(0xFFEEF2FF);
@@ -60,6 +71,10 @@ class OrbitTheme {
 
     return ThemeData(
       useMaterial3: true,
+      pageTransitionsTheme: PageTransitionsTheme(builders: {
+        ...const PageTransitionsTheme().builders,
+        TargetPlatform.android: const OrbitPageTransitionsBuilder(),
+      }),
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
       fontFamily: 'Roboto',
@@ -93,7 +108,8 @@ class OrbitTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFFF5F7FF),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         hintStyle: const TextStyle(color: OrbitColors.textMuted),
         labelStyle: const TextStyle(color: OrbitColors.textSecondary),
         floatingLabelStyle: const TextStyle(color: OrbitColors.primaryNavy),
@@ -107,7 +123,8 @@ class OrbitTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: const BorderSide(color: OrbitColors.primaryNavy, width: 1.6),
+          borderSide:
+              const BorderSide(color: OrbitColors.primaryNavy, width: 1.6),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),

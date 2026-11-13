@@ -94,7 +94,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return true;
     } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ?? 'Login failed. Please check credentials.';
+      final msg = e.response?.data?['message'] ??
+          'Login failed. Please check credentials.';
       state = state.copyWith(isLoading: false, errorMessage: msg);
       return false;
     } catch (e) {

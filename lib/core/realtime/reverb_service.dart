@@ -46,7 +46,8 @@ class ReverbRealtimeService {
           ((data['scheme'] ?? 'https') == 'https' ? 443 : 8080);
       final scheme = data['scheme'] as String? ?? 'https';
       final appKey = data['app_key'] as String? ?? 'erplab_reverb_key';
-      _authEndpoint = data['auth_endpoint'] as String? ?? '/api/broadcasting/auth';
+      _authEndpoint =
+          data['auth_endpoint'] as String? ?? '/api/broadcasting/auth';
 
       final wsScheme = scheme == 'https' ? 'wss' : 'ws';
       final uri = Uri.parse(
@@ -82,7 +83,8 @@ class ReverbRealtimeService {
       final event = decoded['event'] as String?;
       if (event == 'pusher:connection_established') {
         final rawData = decoded['data'];
-        final connectionData = rawData is String ? jsonDecode(rawData) : rawData;
+        final connectionData =
+            rawData is String ? jsonDecode(rawData) : rawData;
         if (connectionData is! Map || connectionData['socket_id'] is! String) {
           debugPrint('Reverb did not provide a socket ID.');
           return;
@@ -132,7 +134,8 @@ class ReverbRealtimeService {
     }
   }
 
-  void Function() subscribe(String channelName, void Function(dynamic) onEvent) {
+  void Function() subscribe(
+      String channelName, void Function(dynamic) onEvent) {
     final listeners = _channelListeners.putIfAbsent(channelName, () => []);
     listeners.add(onEvent);
     if (_isConnected) {
@@ -151,7 +154,9 @@ class ReverbRealtimeService {
   Future<void> _subscribeToChannel(String channelName) async {
     final channel = _channel;
     final socketId = _socketId;
-    if (!_isConnected || channel == null || socketId == null ||
+    if (!_isConnected ||
+        channel == null ||
+        socketId == null ||
         !_channelListeners.containsKey(channelName) ||
         _subscribedChannels.contains(channelName) ||
         !_subscriptionsInFlight.add(channelName)) {
@@ -168,7 +173,8 @@ class ReverbRealtimeService {
         );
         final result = response.data;
         if (result is! Map || result['auth'] is! String) {
-          throw const FormatException('Unexpected private channel auth response');
+          throw const FormatException(
+              'Unexpected private channel auth response');
         }
         payload['auth'] = result['auth'];
         if (result['channel_data'] != null) {
@@ -176,18 +182,22 @@ class ReverbRealtimeService {
         }
       }
 
-      if (!identical(channel, _channel) || socketId != _socketId ||
+      if (!identical(channel, _channel) ||
+          socketId != _socketId ||
           !_channelListeners.containsKey(channelName)) {
-        connectionChanged = !identical(channel, _channel) || socketId != _socketId;
+        connectionChanged =
+            !identical(channel, _channel) || socketId != _socketId;
         return;
       }
-      channel.sink.add(jsonEncode({'event': 'pusher:subscribe', 'data': payload}));
+      channel.sink
+          .add(jsonEncode({'event': 'pusher:subscribe', 'data': payload}));
       _subscribedChannels.add(channelName);
     } catch (error) {
       debugPrint('Unable to subscribe to Reverb channel $channelName: $error');
     } finally {
       _subscriptionsInFlight.remove(channelName);
-      if (connectionChanged && _isConnected &&
+      if (connectionChanged &&
+          _isConnected &&
           _channelListeners.containsKey(channelName) &&
           !_subscribedChannels.contains(channelName)) {
         scheduleMicrotask(() => unawaited(_subscribeToChannel(channelName)));

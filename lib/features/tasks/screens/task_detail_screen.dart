@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/orbit_workspace.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../inbox/screens/discussion_panel.dart';
@@ -23,7 +24,8 @@ class TaskDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(_taskDetailProvider(taskId));
-    return Scaffold(
+    return OrbitWorkspaceScaffold(
+      subtitle: 'Overview, assignees & discussion',
       appBar: AppBar(title: const Text('Task details')),
       body: detail.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -62,7 +64,7 @@ class TaskDetailScreen extends ConsumerWidget {
           final attachments = task['attachments'] is List
               ? task['attachments'] as List
               : const [];
-          return ListView(padding: const EdgeInsets.all(16), children: [
+          return OrbitDetailList(children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -114,25 +116,29 @@ class TaskDetailScreen extends ConsumerWidget {
             ],
             if (names.isNotEmpty)
               ListTile(
-                  leading: const Icon(Icons.people_outline, color: OrbitColors.primaryNavy),
+                  leading: const Icon(Icons.people_outline,
+                      color: OrbitColors.primaryNavy),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Assignees'),
                   subtitle: Text(names)),
             if (task['due_date'] != null)
               ListTile(
-                  leading: const Icon(Icons.calendar_today_outlined, color: OrbitColors.primaryNavy),
+                  leading: const Icon(Icons.calendar_today_outlined,
+                      color: OrbitColors.primaryNavy),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Due date'),
                   subtitle: Text(task['due_date'].toString().split('T').first)),
             if (project is Map && project['name'] != null)
               ListTile(
-                  leading: const Icon(Icons.folder_outlined, color: OrbitColors.primaryNavy),
+                  leading: const Icon(Icons.folder_outlined,
+                      color: OrbitColors.primaryNavy),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Project'),
                   subtitle: Text(project['name'].toString())),
             if (priority != null || complexity != null)
               ListTile(
-                  leading: const Icon(Icons.flag_outlined, color: OrbitColors.primaryNavy),
+                  leading: const Icon(Icons.flag_outlined,
+                      color: OrbitColors.primaryNavy),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Priority / complexity'),
                   subtitle: Text(
@@ -163,8 +169,11 @@ class TaskDetailScreen extends ConsumerWidget {
                     color: OrbitColors.primaryNavy, size: 19),
               ),
               const SizedBox(width: 10),
-              Text('Discussion', style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800, color: OrbitColors.textNavy)),
+              Expanded(
+                  child: Text('Discussion',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: OrbitColors.textNavy))),
             ]),
             const SizedBox(height: 8),
             InboxDiscussion(module: 'task', subjectKey: taskId.toString()),

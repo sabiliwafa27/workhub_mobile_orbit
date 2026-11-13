@@ -33,9 +33,7 @@ class UserModel {
     // permissions is a List<String>
     List<String> perms = [];
     if (orbit?['permissions'] is List) {
-      perms = (orbit!['permissions'] as List)
-          .map((e) => e.toString())
-          .toList();
+      perms = (orbit!['permissions'] as List).map((e) => e.toString()).toList();
     }
 
     // modules is a Map<String, dynamic> (e.g. {"sales_order": {"enabled": true}, ...})
@@ -49,7 +47,8 @@ class UserModel {
     }
 
     final emailStr = json['email'] as String? ?? '';
-    final defaultUsername = emailStr.contains('@') ? emailStr.split('@').first : null;
+    final defaultUsername =
+        emailStr.contains('@') ? emailStr.split('@').first : null;
 
     return UserModel(
       id: json['id'] as int? ?? 0,
@@ -60,7 +59,9 @@ class UserModel {
       employeeCode: json['employee_code'] as String?,
       profilePhotoUrl: json['profile_photo_url'] as String?,
       username: json['username'] as String? ?? defaultUsername,
-      title: json['title'] as String? ?? json['job_title'] as String? ?? json['position'] as String?,
+      title: json['title'] as String? ??
+          json['job_title'] as String? ??
+          json['position'] as String?,
       department: json['department'] as String? ?? json['division'] as String?,
       permissions: perms,
       modules: mods,

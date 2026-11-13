@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/widgets/orbit_workspace.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../models/inbox_item_model.dart';
@@ -142,8 +143,10 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           .compareTo(timestamp(left, salesComment: bothSales));
     });
 
-    return Scaffold(
+    return OrbitWorkspaceScaffold(
+      subtitle: 'Tasks, conversations & approvals',
       floatingActionButton: FloatingActionButton.large(
+        heroTag: 'inbox-fab',
         tooltip: 'Create task, EC or chat',
         onPressed: () async {
           final action = await showModalBottomSheet<String>(
@@ -210,13 +213,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: OrbitColors.textNavy,
+            color: Colors.white,
           ),
         ),
         actions: [
           IconButton(
-            icon:
-                const Icon(Icons.refresh_rounded, color: OrbitColors.textNavy),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             onPressed: () {
               ref.read(inboxNotifierProvider.notifier).loadInbox();
             },
@@ -232,7 +234,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Column(children: [
+              child: OrbitSurface(
+                  child: Column(children: [
                 TextField(
                     controller: _searchController,
                     onChanged: (value) {
@@ -254,7 +257,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 Row(children: [
                   Expanded(
                       child: DropdownButtonFormField<String>(
-                    value: _view,
+                    key: ValueKey('status-$_view'),
+                    initialValue: _view,
                     isExpanded: true,
                     decoration: const InputDecoration(
                         labelText: 'Status',
@@ -284,7 +288,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                       child: DropdownButtonFormField<String>(
-                    value: _selectedSource,
+                    key: ValueKey('source-$_selectedSource'),
+                    initialValue: _selectedSource,
                     isExpanded: true,
                     decoration: const InputDecoration(
                         labelText: 'Source',
@@ -311,13 +316,13 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     color: OrbitColors.bubbleBlue,
                     borderRadius: BorderRadius.circular(20),
                     child: SwitchListTile(
-                    title: const Text('Unread only',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: OrbitColors.textNavy)),
-                    value: _unreadOnly,
-                    onChanged: (value) => setState(() => _unreadOnly = value),
-                    activeColor: OrbitColors.primaryNavy,
+                      title: const Text('Unread only',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: OrbitColors.textNavy)),
+                      value: _unreadOnly,
+                      onChanged: (value) => setState(() => _unreadOnly = value),
+                      activeThumbColor: OrbitColors.primaryNavy,
                     ),
                   ),
                 ),
@@ -359,7 +364,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                       ),
                     ),
                   ),
-              ]),
+              ])),
             ),
 
             // Items List
@@ -432,7 +437,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                               : ListView.separated(
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 96),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(12, 6, 12, 96),
                                   itemCount: filteredItems.length,
                                   separatorBuilder: (_, __) =>
                                       const SizedBox(height: 8),
@@ -464,7 +470,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                         ? Icons.alternate_email
                         : Icons.task_alt_outlined;
     return Material(
-        color: OrbitColors.cardSurface,
+        color: OrbitColors.cardSurface.withValues(alpha: .96),
+        elevation: 1,
+        shadowColor: const Color(0x1006244D),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: OrbitColors.cardBorder),
@@ -611,46 +619,69 @@ class InboxItemDetailScreen extends ConsumerWidget {
   const InboxItemDetailScreen({super.key, required this.item});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+  Widget build(BuildContext context, WidgetRef ref) => OrbitWorkspaceScaffold(
+        subtitle: 'Record details & discussion',
         appBar: AppBar(title: Text(item.sourceLabel)),
-        body: ListView(padding: const EdgeInsets.all(16), children: [
+        body: OrbitDetailList(children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: OrbitColors.cardSurface,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: Colors.white),
-              boxShadow: const [BoxShadow(color: Color(0x1606244D), blurRadius: 16, offset: Offset(0, 6))],
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x1606244D),
+                    blurRadius: 16,
+                    offset: Offset(0, 6))
+              ],
             ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                const CircleAvatar(radius: 23, backgroundColor: OrbitColors.bubbleBlue,
-                    child: Icon(Icons.layers_outlined, color: OrbitColors.primaryNavy)),
+                const CircleAvatar(
+                    radius: 23,
+                    backgroundColor: OrbitColors.bubbleBlue,
+                    child: Icon(Icons.layers_outlined,
+                        color: OrbitColors.primaryNavy)),
                 const SizedBox(width: 12),
-                Expanded(child: Text(item.title, style: const TextStyle(fontSize: 22,
-                    fontWeight: FontWeight.w800, color: OrbitColors.textNavy))),
+                Expanded(
+                    child: Text(item.title,
+                        style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: OrbitColors.textNavy))),
               ]),
               const SizedBox(height: 16),
               if (item.subtitle != null && item.subtitle!.isNotEmpty) ...[
-                Text(item.subtitle!, style: const TextStyle(fontSize: 15, color: OrbitColors.textSecondary)),
+                Text(item.subtitle!,
+                    style: const TextStyle(
+                        fontSize: 15, color: OrbitColors.textSecondary)),
                 const SizedBox(height: 10),
               ],
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                decoration: BoxDecoration(color: OrbitColors.kpiGreenBg,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                decoration: BoxDecoration(
+                    color: OrbitColors.kpiGreenBg,
                     borderRadius: BorderRadius.circular(999)),
                 child: Text(item.status.replaceAll('_', ' '),
                     style: const TextStyle(color: Color(0xFF15803D))),
               ),
               const SizedBox(height: 10),
               Row(children: [
-                const Icon(Icons.calendar_today_outlined, size: 18, color: OrbitColors.primaryNavy),
+                const Icon(Icons.calendar_today_outlined,
+                    size: 18, color: OrbitColors.primaryNavy),
                 const SizedBox(width: 10),
-                Expanded(child: Text(item.createdAt, style: const TextStyle(color: OrbitColors.textSecondary))),
+                Expanded(
+                    child: Text(item.createdAt,
+                        style:
+                            const TextStyle(color: OrbitColors.textSecondary))),
               ]),
             ]),
           ),
-          const SizedBox(height: 12),          if (item.logisticInDetail case final reference?)
+          const SizedBox(height: 12),
+          if (item.logisticInDetail case final reference?)
             TextButton.icon(
               icon: const Icon(Icons.open_in_new),
               label: const Text('Open Logistic In details'),

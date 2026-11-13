@@ -38,12 +38,16 @@ class ChatItemModel {
       preview = 'Active discussion';
     }
 
-    final author = latestComment?['author'] as String? ?? lastMsg?['sender_name'] as String?;
-    final rawDate = latestComment?['created_at'] as String? ?? json['updated_at'] as String?;
+    final author = latestComment?['author'] as String? ??
+        lastMsg?['sender_name'] as String?;
+    final rawDate = latestComment?['created_at'] as String? ??
+        json['updated_at'] as String?;
 
     return ChatItemModel(
       id: json['customer_uuid'] as String? ?? json['id']?.toString() ?? '',
-      title: json['customer_name'] as String? ?? json['name'] as String? ?? 'Discussion',
+      title: json['customer_name'] as String? ??
+          json['name'] as String? ??
+          'Discussion',
       lastMessage: preview,
       time: _formatTime(rawDate),
       isPinned: json['is_pinned'] as bool? ?? false,

@@ -219,7 +219,7 @@ void main() {
     expect(find.text('No assigned tasks'), findsNothing);
   });
 
-  testWidgets('large tonal dashboard button opens EC and task creation choices',
+  testWidgets('dashboard task menu opens EC and task creation choices',
       (tester) async {
     final api = ApiClient(
         customDio: Dio()..httpClientAdapter = _Adapter(),
@@ -233,12 +233,11 @@ void main() {
                 onOpenNotifications: () {},
                 onOpenCheckIn: () {}))));
     await tester.pumpAndSettle();
-    final createButton = find.byType(FloatingActionButton);
-    final buttonSurface = find.descendant(
-        of: createButton, matching: find.byType(Material));
-    expect(tester.widget<Material>(buttonSurface).color, OrbitColors.bubbleBlue);
-    expect(tester.getSize(createButton), const Size(96, 96));
-    await tester.tap(find.byType(FloatingActionButton));
+    await tester.scrollUntilVisible(find.byTooltip('Task options'), 250,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byTooltip('Task options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create task or EC'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Create EC'));
     await tester.pumpAndSettle();
@@ -249,7 +248,9 @@ void main() {
         isTrue);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(FloatingActionButton));
+    await tester.tap(find.byTooltip('Task options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create task or EC'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Create task'));
     await tester.pumpAndSettle();
@@ -337,8 +338,10 @@ void main() {
                 onOpenNotifications: () {},
                 onOpenCheckIn: () {}))));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('EC'), 300,
+    await tester.scrollUntilVisible(find.byTooltip('Task options'), 300,
         scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byTooltip('Task options'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('EC'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Next'), 300,
@@ -365,8 +368,10 @@ void main() {
                 onOpenNotifications: () {},
                 onOpenCheckIn: () {}))));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('EC'), 300,
+    await tester.scrollUntilVisible(find.byTooltip('Task options'), 300,
         scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byTooltip('Task options'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('EC'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('EC idea'), 300,
@@ -392,8 +397,10 @@ void main() {
                 onOpenNotifications: () {},
                 onOpenCheckIn: () {}))));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('EC'), 300,
+    await tester.scrollUntilVisible(find.byTooltip('Task options'), 300,
         scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byTooltip('Task options'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('EC'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('EC idea'), 300,
@@ -418,8 +425,10 @@ void main() {
                 onOpenNotifications: () {},
                 onOpenCheckIn: () {}))));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('EC'), 300,
+    await tester.scrollUntilVisible(find.byTooltip('Task options'), 300,
         scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byTooltip('Task options'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('EC'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Change status'), 300,
@@ -451,8 +460,10 @@ void main() {
                 onOpenNotifications: () {},
                 onOpenCheckIn: () {}))));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('EC'), 300,
+    await tester.scrollUntilVisible(find.byTooltip('Task options'), 300,
         scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byTooltip('Task options'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('EC'));
     await tester.pumpAndSettle();
     final inboxLoads =

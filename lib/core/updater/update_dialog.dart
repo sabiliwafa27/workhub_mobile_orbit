@@ -103,7 +103,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 widget.releaseInfo.releaseNotes,
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: ErpColors.textSecondary),
+                style: const TextStyle(
+                    fontSize: 12, color: ErpColors.textSecondary),
               ),
             ),
             const SizedBox(height: 14),
@@ -122,7 +123,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
             Center(
               child: Text(
                 '${(_progress * 100).toInt()}% Downloading...',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ErpColors.primaryNavy),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: ErpColors.primaryNavy),
               ),
             ),
           ],
@@ -139,7 +143,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
         if (!_isDownloading) ...[
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Later', style: TextStyle(color: ErpColors.textSecondary)),
+            child: const Text('Later',
+                style: TextStyle(color: ErpColors.textSecondary)),
           ),
           FilledButton(
             onPressed: _startUpdate,

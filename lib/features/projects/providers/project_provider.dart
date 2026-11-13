@@ -4,14 +4,17 @@ import '../../../core/realtime/reverb_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../tasks/providers/task_provider.dart';
 
-final projectTasksProvider = FutureProvider.family<List<TaskItemModel>, int>((ref, projectId) async {
-  final response = await ref.watch(apiClientProvider).dio.get('/projects/$projectId/tasks');
+final projectTasksProvider =
+    FutureProvider.family<List<TaskItemModel>, int>((ref, projectId) async {
+  final response =
+      await ref.watch(apiClientProvider).dio.get('/projects/$projectId/tasks');
   final data = response.data;
   if (data is! Map || data['data'] is! List) {
     throw const FormatException('Unexpected project tasks response');
   }
   return (data['data'] as List)
-      .map((item) => TaskItemModel.fromJson(Map<String, dynamic>.from(item as Map)))
+      .map((item) =>
+          TaskItemModel.fromJson(Map<String, dynamic>.from(item as Map)))
       .toList();
 });
 
@@ -39,9 +42,13 @@ class ProjectItemModel {
       id: json['id'] as int? ?? json['project_id'] as int? ?? 0,
       name: json['name'] as String? ?? json['title'] as String? ?? 'Project',
       description: json['description'] as String? ?? '',
-      progress: json['progress'] as int? ?? json['progress_percent'] as int? ?? 0,
-      activeTasks: json['active_tasks'] as int? ?? json['open_count'] as int? ?? 0,
-      completedTasks: json['completed_tasks'] as int? ?? json['completed_count'] as int? ?? 0,
+      progress:
+          json['progress'] as int? ?? json['progress_percent'] as int? ?? 0,
+      activeTasks:
+          json['active_tasks'] as int? ?? json['open_count'] as int? ?? 0,
+      completedTasks: json['completed_tasks'] as int? ??
+          json['completed_count'] as int? ??
+          0,
       status: json['status'] as String? ?? 'active',
     );
   }
@@ -61,9 +68,14 @@ class ProjectRepository {
     try {
       final response = await _apiClient.dio.get('/projects');
       if (response.data is Map) {
-        final raw = response.data['data'] ?? response.data['projects'] ?? response.data['tasks'];
+        final raw = response.data['data'] ??
+            response.data['projects'] ??
+            response.data['tasks'];
         if (raw is List) {
-          return raw.map((json) => ProjectItemModel.fromJson(json as Map<String, dynamic>)).toList();
+          return raw
+              .map((json) =>
+                  ProjectItemModel.fromJson(json as Map<String, dynamic>))
+              .toList();
         }
       }
       return [];
@@ -114,7 +126,8 @@ class ProjectNotifier extends StateNotifier<ProjectListState> {
   final ReverbRealtimeService _reverb;
   final int? _userId;
 
-  ProjectNotifier(this._repo, this._reverb, this._userId) : super(ProjectListState()) {
+  ProjectNotifier(this._repo, this._reverb, this._userId)
+      : super(ProjectListState()) {
     loadProjects();
     _setupRealtime();
   }
@@ -142,7 +155,8 @@ class ProjectNotifier extends StateNotifier<ProjectListState> {
   }
 }
 
-final projectNotifierProvider = StateNotifierProvider<ProjectNotifier, ProjectListState>((ref) {
+final projectNotifierProvider =
+    StateNotifierProvider<ProjectNotifier, ProjectListState>((ref) {
   final repo = ref.watch(projectRepositoryProvider);
   final reverb = ref.watch(reverbServiceProvider);
   final user = ref.watch(authProvider).user;

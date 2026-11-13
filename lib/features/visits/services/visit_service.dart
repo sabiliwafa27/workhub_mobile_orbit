@@ -10,7 +10,8 @@ final visitServiceProvider = Provider<VisitService>((ref) {
   return VisitService(apiClient);
 });
 
-final visitTargetsNotifierProvider = FutureProvider<List<VisitTargetModel>>((ref) async {
+final visitTargetsNotifierProvider =
+    FutureProvider<List<VisitTargetModel>>((ref) async {
   final service = ref.watch(visitServiceProvider);
   return await service.getVisitTargets();
 });
@@ -32,17 +33,22 @@ class VisitService {
     }
   }
 
-  Future<List<VisitTargetModel>> getVisitTargets({String? date, String status = 'all'}) async {
+  Future<List<VisitTargetModel>> getVisitTargets(
+      {String? date, String status = 'all'}) async {
     try {
       final queryParams = <String, dynamic>{'status': status};
       if (date != null && date.isNotEmpty) {
         queryParams['date'] = date;
       }
 
-      final response = await _apiClient.dio.get('/visit-targets', queryParameters: queryParams);
+      final response = await _apiClient.dio
+          .get('/visit-targets', queryParameters: queryParams);
       if (response.data is Map && response.data['data'] is List) {
         final list = response.data['data'] as List;
-        return list.map((json) => VisitTargetModel.fromJson(json as Map<String, dynamic>)).toList();
+        return list
+            .map((json) =>
+                VisitTargetModel.fromJson(json as Map<String, dynamic>))
+            .toList();
       }
       return [];
     } catch (_) {
@@ -65,7 +71,8 @@ class VisitService {
         'longitude': longitude,
         'client_captured_at': DateTime.now().toIso8601String(),
         if (note != null && note.isNotEmpty) 'note': note,
-        'photo': await MultipartFile.fromFile(photoPath, filename: 'checkin_evidence.jpg'),
+        'photo': await MultipartFile.fromFile(photoPath,
+            filename: 'checkin_evidence.jpg'),
       });
 
       final response = await _apiClient.dio.post('/check-ins', data: formData);
