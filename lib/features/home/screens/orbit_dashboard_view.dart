@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../inbox/providers/inbox_provider.dart';
+import '../../inbox/screens/inbox_screen.dart';
 import '../../tasks/providers/task_provider.dart';
 import '../../tasks/providers/ec_progress_provider.dart';
 import '../../tasks/screens/create_work_item_screen.dart';
@@ -18,6 +19,13 @@ final _dashboardInboxProvider = FutureProvider<InboxFetchResult>((ref) async {
   // Refresh when the Inbox changes, but fetch its pending, unfiltered view.
   ref.watch(inboxNotifierProvider.select((state) => state.items));
   return ref.watch(inboxRepositoryProvider).fetchTodos();
+});
+
+final _performanceProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  ref.watch(taskNotifierProvider.select((state) => state.tasks));
+  final response =
+      await ref.watch(apiClientProvider).dio.get('/tasks/performance');
+  return Map<String, dynamic>.from(response.data['data'] as Map);
 });
 
 class OrbitDashboardView extends ConsumerStatefulWidget {
@@ -430,51 +438,6 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     ))),
           ],
         )),
-        Row(
-          children: [
-            Stack(
-              children: [
-                IconButton(
-                  onPressed: widget.onOpenNotifications,
-                  icon: const Icon(Icons.notifications_none_rounded,
-                      color: OrbitColors.textPrimary, size: 24),
-                  style: IconButton.styleFrom(
-                    backgroundColor: OrbitColors.cardSurface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: OrbitColors.cardBorder),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: OrbitColors.accentCoral,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: widget.onOpenSearch,
-              icon: const Icon(Icons.dashboard_customize_outlined,
-                  color: OrbitColors.textPrimary, size: 22),
-              style: IconButton.styleFrom(
-                backgroundColor: OrbitColors.cardSurface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: OrbitColors.cardBorder),
-                ),
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -790,13 +753,9 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     final activeCount = taskState.total;
     final taskCountUnavailable = taskState.error != null ||
         (taskState.isLoading && taskState.tasks.isEmpty);
-    final inboxCountUnavailable = inboxState.error != null ||
-        inboxState.incompleteCount == null ||
-        inboxState.completeCount == null;
-    final totalInbox = inboxState.incompleteCount ?? 0;
-    final completeInbox = inboxState.completeCount ?? 0;
-    final inboxCount = totalInbox + completeInbox;
-    final progressRatio = inboxCount > 0 ? completeInbox / inboxCount : 0.0;
+    final performance = ref.watch(_performanceProvider);
+    final inboxCountUnavailable = !performance.hasValue;
+    final totalInbox = performance.valueOrNull?['earned_points'] ?? 0;
 
     return Row(
       children: [
@@ -912,7 +871,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Inbox Todos',
+                    'Performance',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -927,13 +886,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     SizedBox(
                       width: 58,
                       height: 58,
-                      child: CircularProgressIndicator(
-                        value: progressRatio > 0 ? progressRatio : 0.0,
-                        strokeWidth: 5.5,
-                        backgroundColor: OrbitColors.creamBorder,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                            OrbitColors.brandOrange),
-                      ),
+                      child: const SizedBox.shrink(),
                     ),
                     Column(
                       children: [
@@ -945,9 +898,11 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                             color: OrbitColors.textNavy,
                           ),
                         ),
-                        const Text(
-                          'Pending',
-                          style: TextStyle(
+                        Text(
+                          performance.hasError
+                              ? 'Unavailable'
+                              : 'Tasks ${performance.valueOrNull?['task_points'] ?? '—'} · EC ${performance.valueOrNull?['ec_points'] ?? '—'}',
+                          style: const TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w500,
                             color: OrbitColors.textSecondary,
@@ -1069,7 +1024,6 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final task = tasks[index];
-              final date = DateTime.tryParse(task.dueDate.split('T').first);
               final actionLabel = task.rowAction == 'request_review'
                   ? 'Request review'
                   : 'Complete';
@@ -1133,18 +1087,6 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                                               : null))),
                             ),
                             Wrap(spacing: 4, runSpacing: 4, children: [
-                              for (final assignee in task.assignees)
-                                Chip(
-                                    label: Text(assignee),
-                                    visualDensity: VisualDensity.compact),
-                              if (date != null)
-                                Chip(
-                                    avatar: const Icon(
-                                        Icons.calendar_today_outlined,
-                                        size: 14),
-                                    label: Text(
-                                        DateFormat('EEE, MMM d').format(date)),
-                                    visualDensity: VisualDensity.compact),
                               if (task.status == 'pending_review' ||
                                   task.hasPendingReview)
                                 const Chip(
@@ -1296,76 +1238,88 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 tagColor = OrbitColors.coralIcon;
               }
 
-              return Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: OrbitColors.cardSurface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: OrbitColors.cardBorder),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x04000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: tagBg,
-                        borderRadius: BorderRadius.circular(6),
+              return InkWell(
+                onTap: () {
+                  final id = int.tryParse(item.subjectKey ?? '');
+                  final isTask = item.subjectType == 'task' ||
+                      const ['task', 'workhub', 'task-mine', 'task-assigned']
+                          .contains(item.moduleCode);
+                  Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => isTask && id != null
+                          ? TaskDetailScreen(taskId: id)
+                          : InboxItemDetailScreen(item: item)));
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: OrbitColors.cardSurface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: OrbitColors.cardBorder),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x04000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
                       ),
-                      child: Text(
-                        item.sourceLabel,
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: tagColor,
+                    ],
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: tagBg,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          item.sourceLabel,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: tagColor,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.title,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: OrbitColors.textNavy,
-                            ),
-                          ),
-                          if (item.subtitle != null &&
-                              item.subtitle!.isNotEmpty) ...[
-                            const SizedBox(height: 2),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              item.subtitle!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                              item.title,
                               style: const TextStyle(
-                                fontSize: 11,
-                                color: OrbitColors.textSecondary,
-                                height: 1.3,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: OrbitColors.textNavy,
                               ),
                             ),
+                            if (item.subtitle != null &&
+                                item.subtitle!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                item.subtitle!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: OrbitColors.textSecondary,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      item.createdAt,
-                      style: const TextStyle(
-                          fontSize: 10, color: OrbitColors.textMuted),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        item.createdAt,
+                        style: const TextStyle(
+                            fontSize: 10, color: OrbitColors.textMuted),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -1441,7 +1395,9 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: isSelected ? OrbitColors.pillDark : OrbitColors.cardSurface,
+                      color: isSelected
+                          ? OrbitColors.pillDark
+                          : OrbitColors.cardSurface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: isSelected

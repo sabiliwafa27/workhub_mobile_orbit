@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../../core/navigation/home_navigation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/realtime/reverb_service.dart';
 import '../../../core/theme/orbit_theme.dart';
@@ -25,6 +27,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
   @override
   void initState() {
     super.initState();
+    homeRequests.addListener(_returnHome);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(reverbServiceProvider).connect();
     });
@@ -32,6 +35,42 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
 
   void _onBottomNavTapped(int index) {
     setState(() => _currentIndex = index);
+  }
+
+  void _returnHome() {
+    if (mounted) setState(() => _currentIndex = 0);
+  }
+
+  @override
+  void dispose() {
+    homeRequests.removeListener(_returnHome);
+    super.dispose();
+  }
+
+  bool _confirmingExit = false;
+  Future<void> _back() async {
+    if (_currentIndex != 0) {
+      _returnHome();
+      return;
+    }
+    if (_confirmingExit) return;
+    _confirmingExit = true;
+    final quit = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+              title: const Text('Quit Orbit?'),
+              content: const Text('Are you sure you want to quit Orbit?'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel')),
+                FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Quit'))
+              ],
+            ));
+    _confirmingExit = false;
+    if (quit == true) await SystemNavigator.pop();
   }
 
   void _showQuickActionSheet() {
@@ -72,14 +111,20 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
                     color: OrbitColors.coralIconBg,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.location_on_outlined, color: OrbitColors.coralIcon),
+                  child: const Icon(Icons.location_on_outlined,
+                      color: OrbitColors.coralIcon),
                 ),
-                title: const Text('GPS Check-In Itinerary', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Take visit proof photo & clock GPS location', style: TextStyle(fontSize: 12)),
+                title: const Text('GPS Check-In Itinerary',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text(
+                    'Take visit proof photo & clock GPS location',
+                    style: TextStyle(fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Opening GPS Visit Check-in...'), duration: Duration(seconds: 1)),
+                    const SnackBar(
+                        content: Text('Opening GPS Visit Check-in...'),
+                        duration: Duration(seconds: 1)),
                   );
                 },
               ),
@@ -90,13 +135,17 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
                     color: OrbitColors.bubbleBlue,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.add_task_rounded, color: OrbitColors.primaryNavy),
+                  child: const Icon(Icons.add_task_rounded,
+                      color: OrbitColors.primaryNavy),
                 ),
-                title: const Text('New Task / Delegation', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Assign task or review request to team', style: TextStyle(fontSize: 12)),
+                title: const Text('New Task / Delegation',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Assign task or review request to team',
+                    style: TextStyle(fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TaskScreen()));
+                  Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const TaskScreen()));
                 },
               ),
               ListTile(
@@ -106,13 +155,17 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
                     color: const Color(0xFFD1FAE5),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF059669)),
+                  child: const Icon(Icons.chat_bubble_outline_rounded,
+                      color: Color(0xFF059669)),
                 ),
-                title: const Text('Customer Discussion', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Open WhatsApp discussion thread', style: TextStyle(fontSize: 12)),
+                title: const Text('Customer Discussion',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Open WhatsApp discussion thread',
+                    style: TextStyle(fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChatListScreen()));
+                  Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const ChatListScreen()));
                 },
               ),
               const SizedBox(height: 8),
@@ -136,12 +189,19 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     if (shorebird != ShorebirdUpdateResult.unavailable) {
       final message = switch (shorebird) {
         ShorebirdUpdateResult.upToDate => 'You are using the latest version.',
-        ShorebirdUpdateResult.downloaded => 'Update downloaded. Close and reopen WorkHub to use it.',
-        ShorebirdUpdateResult.restartRequired => 'An update is ready. Close and reopen WorkHub to apply it.',
-        ShorebirdUpdateResult.failed => 'Unable to check or download the update. Please try again.',
+        ShorebirdUpdateResult.downloaded =>
+          'Update downloaded. Close and reopen WorkHub to use it.',
+        ShorebirdUpdateResult.restartRequired =>
+          'An update is ready. Close and reopen WorkHub to apply it.',
+        ShorebirdUpdateResult.failed =>
+          'Unable to check or download the update. Please try again.',
         ShorebirdUpdateResult.unavailable => '',
       };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: shorebird == ShorebirdUpdateResult.failed ? null : OrbitColors.kpiGreen));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(message),
+          backgroundColor: shorebird == ShorebirdUpdateResult.failed
+              ? null
+              : OrbitColors.kpiGreen));
       return;
     }
     final release = await updater.checkForUpdate();
@@ -171,7 +231,8 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
         backgroundColor: OrbitColors.cardSurface,
         title: const Text(
           'My Profile',
-          style: TextStyle(color: OrbitColors.textNavy, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: OrbitColors.textNavy, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -182,7 +243,9 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
                 radius: 36,
                 backgroundColor: OrbitColors.bubbleBlue,
                 child: Text(
-                  user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
+                  user?.name.isNotEmpty == true
+                      ? user!.name[0].toUpperCase()
+                      : 'U',
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
@@ -198,13 +261,15 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
             _buildProfileRow('Job Title', user?.title ?? '-'),
             _buildProfileRow('Department', user?.department ?? '-'),
             _buildProfileRow('Employee Code', user?.employeeCode ?? '-'),
-            _buildProfileRow('Employee ID', user?.employeeId?.toString() ?? '-'),
+            _buildProfileRow(
+                'Employee ID', user?.employeeId?.toString() ?? '-'),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close', style: TextStyle(color: OrbitColors.textSecondary)),
+            child: const Text('Close',
+                style: TextStyle(color: OrbitColors.textSecondary)),
           ),
           FilledButton(
             onPressed: () {
@@ -232,13 +297,19 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
             width: 100,
             child: Text(
               '$label:',
-              style: const TextStyle(color: OrbitColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                  color: OrbitColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: OrbitColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                  color: OrbitColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -262,7 +333,8 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
               Navigator.pop(ctx);
               ref.read(authProvider.notifier).logout();
             },
-            child: const Text('Logout', style: TextStyle(color: OrbitColors.accentCoral)),
+            child: const Text('Logout',
+                style: TextStyle(color: OrbitColors.accentCoral)),
           ),
         ],
       ),
@@ -284,13 +356,20 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
       const ProjectsScreen(),
     ];
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _back();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: IndexedStack(
+          index: _currentIndex,
+          children: pages,
+        ),
+        bottomNavigationBar:
+            SafeArea(top: false, child: _buildFloatingBottomNav(inboxCount)),
       ),
-      bottomNavigationBar: SafeArea(top: false, child: _buildFloatingBottomNav(inboxCount)),
     );
   }
 
@@ -353,7 +432,8 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     int? badgeCount,
   }) {
     final isSelected = _currentIndex == index;
-    return Expanded(child: InkWell(
+    return Expanded(
+        child: InkWell(
       onTap: () => _onBottomNavTapped(index),
       borderRadius: BorderRadius.circular(999),
       child: Padding(
