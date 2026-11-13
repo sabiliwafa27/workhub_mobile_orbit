@@ -3,6 +3,9 @@ import 'package:dio/dio.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
+
+enum ShorebirdUpdateResult { unavailable, upToDate, downloaded, restartRequired, failed }
 
 class ReleaseInfo {
   final String tagName;
@@ -23,6 +26,26 @@ class AppUpdaterService {
   static const String repoName = 'workhub_mobile_orbit';
 
   final Dio _dio = Dio();
+  final ShorebirdUpdater _shorebird;
+
+  AppUpdaterService({ShorebirdUpdater? shorebirdUpdater}) : _shorebird = shorebirdUpdater ?? ShorebirdUpdater();
+
+  Future<ShorebirdUpdateResult> checkForShorebirdUpdate() async {
+    if (!_shorebird.isAvailable) return ShorebirdUpdateResult.unavailable;
+    try {
+      final status = await _shorebird.checkForUpdate();
+      if (status == UpdateStatus.restartRequired) return ShorebirdUpdateResult.restartRequired;
+      if (status != UpdateStatus.outdated) return ShorebirdUpdateResult.upToDate;
+      await _shorebird.update();
+      final nextPatch = await _shorebird.readNextPatch();
+      final currentPatch = await _shorebird.readCurrentPatch();
+      return nextPatch?.number != currentPatch?.number ? ShorebirdUpdateResult.downloaded : ShorebirdUpdateResult.upToDate;
+    } on UpdateException {
+      return ShorebirdUpdateResult.failed;
+    } catch (_) {
+      return ShorebirdUpdateResult.failed;
+    }
+  }
 
   Future<ReleaseInfo?> checkForUpdate() async {
     try {

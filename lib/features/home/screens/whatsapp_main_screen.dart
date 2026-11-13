@@ -57,6 +57,19 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
       ),
     );
     final updater = AppUpdaterService();
+    final shorebird = await updater.checkForShorebirdUpdate();
+    if (!mounted) return;
+    if (shorebird != ShorebirdUpdateResult.unavailable) {
+      final message = switch (shorebird) {
+        ShorebirdUpdateResult.upToDate => 'You are using the latest version.',
+        ShorebirdUpdateResult.downloaded => 'Update downloaded. Close and reopen WorkHub to use it.',
+        ShorebirdUpdateResult.restartRequired => 'An update is ready. Close and reopen WorkHub to apply it.',
+        ShorebirdUpdateResult.failed => 'Unable to check or download the update. Please try again.',
+        ShorebirdUpdateResult.unavailable => '',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: shorebird == ShorebirdUpdateResult.failed ? null : WhatsAppColors.tealGreen));
+      return;
+    }
     final release = await updater.checkForUpdate();
     if (!mounted) return;
 
