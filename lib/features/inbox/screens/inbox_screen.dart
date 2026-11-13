@@ -285,13 +285,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     },
                   )),
                 ]),
-                Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  decoration: BoxDecoration(
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Material(
                     color: OrbitColors.bubbleBlue,
                     borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: SwitchListTile(
+                    child: SwitchListTile(
                     title: const Text('Unread only',
                         style: TextStyle(
                             fontWeight: FontWeight.w700,
@@ -299,6 +298,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     value: _unreadOnly,
                     onChanged: (value) => setState(() => _unreadOnly = value),
                     activeColor: OrbitColors.primaryNavy,
+                    ),
                   ),
                 ),
                 if (_selectedSource != 'All' ||

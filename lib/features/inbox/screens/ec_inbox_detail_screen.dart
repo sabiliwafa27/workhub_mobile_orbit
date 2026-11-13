@@ -104,7 +104,7 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
         final history = detail['progress_history'] is List ? detail['progress_history'] as List : const [];
         final current = detail['current_progress'];
         final progress = current is Map ? (current['percentage'] as num? ?? 0).toDouble() : 0.0;
-        return ListView(padding: const EdgeInsets.all(16), children: [
+        return ListView(cacheExtent: 600, padding: const EdgeInsets.all(16), children: [
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),

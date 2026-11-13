@@ -184,7 +184,7 @@ class _InboxDiscussionState extends ConsumerState<InboxDiscussion> {
           maxLines: 4,
           enabled: !sending,
           decoration: InputDecoration(
-            labelText: 'Write a comment...',
+            labelText: 'Add a comment',
             alignLabelWithHint: true,
             prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
             filled: true,
