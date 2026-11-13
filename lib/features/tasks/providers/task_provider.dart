@@ -11,6 +11,10 @@ class TaskItemModel {
   final int progressPercent;
   final String dueDate;
   final String priority;
+  final String? projectName;
+  final String? rowAction;
+  final bool hasPendingReview;
+  final List<String> assignees;
 
   TaskItemModel({
     required this.id,
@@ -20,6 +24,10 @@ class TaskItemModel {
     required this.progressPercent,
     required this.dueDate,
     required this.priority,
+    this.projectName,
+    this.rowAction,
+    this.hasPendingReview = false,
+    this.assignees = const [],
   });
 
   factory TaskItemModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +39,14 @@ class TaskItemModel {
       progressPercent: json['progress_percent'] as int? ?? json['progress'] as int? ?? 0,
       dueDate: json['due_date'] as String? ?? json['created_at'] as String? ?? '',
       priority: json['priority'] as String? ?? 'medium',
+      projectName: json['project_name'] as String?,
+      rowAction: json['row_action'] as String?,
+      hasPendingReview: json['has_pending_review'] == true,
+      assignees: (json['assignees'] is List ? json['assignees'] as List : const [])
+          .whereType<Map>()
+          .map((person) => (person['full_name'] ?? '').toString())
+          .where((name) => name.isNotEmpty)
+          .toList(),
     );
   }
 }
@@ -45,18 +61,26 @@ class TaskRepository {
 
   TaskRepository(this._apiClient);
 
-  Future<List<TaskItemModel>> fetchTasks({String status = 'all'}) async {
+  Future<TaskPage> fetchTasks({String status = 'all', int page = 1}) async {
     try {
       final response = await _apiClient.dio.get('/tasks', queryParameters: {
         'status': status,
+        'page': page,
+        'per_page': 25,
       });
       if (response.data is Map) {
         final raw = response.data['data'] ?? response.data['tasks'] ?? response.data['incomplete'];
         if (raw is List) {
-          return raw.map((json) => TaskItemModel.fromJson(json as Map<String, dynamic>)).toList();
+          final meta = response.data['meta'];
+          return TaskPage(
+            tasks: raw.map((json) => TaskItemModel.fromJson(json as Map<String, dynamic>)).toList(),
+            page: meta is Map ? (meta['current_page'] as num? ?? page).toInt() : page,
+            lastPage: meta is Map ? (meta['last_page'] as num? ?? page).toInt() : page,
+            total: meta is Map ? (meta['total'] as num? ?? raw.length).toInt() : raw.length,
+          );
         }
       }
-      return [];
+      throw const FormatException('Unexpected task list response');
     } catch (_) {
       rethrow;
     }
@@ -87,7 +111,7 @@ class TaskRepository {
     try {
       final response = await _apiClient.dio.post(
         '/tasks/$taskId/request-review',
-        data: notes != null ? {'notes': notes} : null,
+        data: notes != null ? {'note': notes} : null,
       );
       return response.statusCode == 200;
     } catch (_) {
@@ -96,26 +120,54 @@ class TaskRepository {
   }
 }
 
+class TaskPage {
+  final List<TaskItemModel> tasks;
+  final int page;
+  final int lastPage;
+  final int total;
+  TaskPage({required this.tasks, required this.page, required this.lastPage, required this.total});
+}
+
 class TaskListState {
   final List<TaskItemModel> tasks;
   final bool isLoading;
   final String? error;
+  final int page;
+  final int lastPage;
+  final bool isLoadingMore;
+  final String? loadMoreError;
+  final int total;
 
   TaskListState({
     this.tasks = const [],
     this.isLoading = false,
     this.error,
+    this.page = 1,
+    this.lastPage = 1,
+    this.isLoadingMore = false,
+    this.loadMoreError,
+    this.total = 0,
   });
 
   TaskListState copyWith({
     List<TaskItemModel>? tasks,
     bool? isLoading,
     String? error,
+    int? page,
+    int? lastPage,
+    bool? isLoadingMore,
+    String? loadMoreError,
+    int? total,
   }) {
     return TaskListState(
       tasks: tasks ?? this.tasks,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      page: page ?? this.page,
+      lastPage: lastPage ?? this.lastPage,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      loadMoreError: loadMoreError,
+      total: total ?? this.total,
     );
   }
 }
@@ -124,19 +176,40 @@ class TaskNotifier extends StateNotifier<TaskListState> {
   final TaskRepository _repo;
   final ReverbRealtimeService _reverb;
   final int? _userId;
+  int _generation = 0;
+  String _status = 'all';
 
   TaskNotifier(this._repo, this._reverb, this._userId) : super(TaskListState()) {
     loadTasks();
     _setupRealtime();
   }
 
-  Future<void> loadTasks({String status = 'all'}) async {
-    state = state.copyWith(isLoading: true, error: null);
+  Future<void> loadTasks({String? status}) async {
+    _status = status ?? _status;
+    final generation = ++_generation;
+    state = state.copyWith(isLoading: true, isLoadingMore: false, error: null);
     try {
-      final items = await _repo.fetchTasks(status: status);
-      state = state.copyWith(tasks: items, isLoading: false);
+      final page = await _repo.fetchTasks(status: _status);
+      if (!mounted || generation != _generation) return;
+      state = state.copyWith(tasks: page.tasks, page: page.page, lastPage: page.lastPage, total: page.total, isLoading: false);
     } catch (e) {
+      if (!mounted || generation != _generation) return;
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> loadMore() async {
+    if (state.isLoading || state.isLoadingMore || state.page >= state.lastPage) return;
+    final generation = _generation;
+    state = state.copyWith(isLoadingMore: true);
+    try {
+      final page = await _repo.fetchTasks(status: _status, page: state.page + 1);
+      if (!mounted || generation != _generation) return;
+      final existing = state.tasks.map((task) => task.id).toSet();
+      state = state.copyWith(tasks: [...state.tasks, ...page.tasks.where((task) => !existing.contains(task.id))], page: page.page, lastPage: page.lastPage, total: page.total, isLoadingMore: false);
+    } catch (e) {
+      if (!mounted || generation != _generation) return;
+      state = state.copyWith(isLoadingMore: false, loadMoreError: e.toString());
     }
   }
 

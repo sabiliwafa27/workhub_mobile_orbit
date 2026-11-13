@@ -57,6 +57,9 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
+      - name: Run Flutter tests
+        run: flutter test --no-pub
+
       - name: Cache Gradle dependencies
         uses: gradle/actions/setup-gradle@v4
 

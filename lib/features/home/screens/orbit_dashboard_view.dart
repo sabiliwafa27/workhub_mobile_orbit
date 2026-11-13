@@ -1,21 +1,23 @@
 import 'dart:math';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../inbox/models/inbox_item_model.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../tasks/providers/task_provider.dart';
+import '../../tasks/providers/ec_progress_provider.dart';
+import '../../tasks/screens/create_work_item_screen.dart';
+import '../../tasks/screens/task_detail_screen.dart';
 import '../../visits/models/visit_target_model.dart';
 import '../../visits/services/visit_service.dart';
 
-final _ecProgressProvider = FutureProvider<List<dynamic>>((ref) async {
-  final response = await ref.watch(apiClientProvider).dio.get('/ec/today');
-  if (response.data is! Map || response.data['data'] is! List) {
-    throw const FormatException('Unexpected EC response');
-  }
-  return response.data['data'] as List;
+final _dashboardInboxProvider = FutureProvider<InboxFetchResult>((ref) async {
+  // Refresh when the Inbox changes, but fetch its pending, unfiltered view.
+  ref.watch(inboxNotifierProvider.select((state) => state.items));
+  return ref.watch(inboxRepositoryProvider).fetchTodos();
 });
 
 class OrbitDashboardView extends ConsumerStatefulWidget {
@@ -34,31 +36,173 @@ class OrbitDashboardView extends ConsumerStatefulWidget {
   ConsumerState<OrbitDashboardView> createState() => _OrbitDashboardViewState();
 }
 
+class _EcProgressRow extends ConsumerStatefulWidget {
+  final Map<String, dynamic> entry;
+  final bool canEdit;
+  final int page;
+  const _EcProgressRow({super.key, required this.entry, required this.canEdit, required this.page});
+
+  @override
+  ConsumerState<_EcProgressRow> createState() => _EcProgressRowState();
+}
+
+class _EcProgressRowState extends ConsumerState<_EcProgressRow> {
+  Map<String, dynamic>? attempt;
+  bool saving = false;
+  bool failed = false;
+  String? rejection;
+
+  Future<void> save(int percentage, {bool retry = false}) async {
+    if (saving || !widget.canEdit) return;
+    if (!retry) {
+      final label = percentage == 100 ? 'Selesai' : percentage == 50 ? 'Sedang Berjalan' : 'Belum Dimulai';
+      attempt = {'percentage': percentage, 'note': 'Status diubah menjadi $label.', 'submission_key': const Uuid().v4()};
+    }
+    setState(() { saving = true; failed = false; rejection = null; });
+    try {
+      await ref.read(apiClientProvider).dio.post('/ec/entries/${widget.entry['id']}/progress', data: attempt);
+      if (mounted) {
+        attempt = null;
+        ref.invalidate(ecProgressProvider(widget.page));
+        ref.invalidate(_dashboardInboxProvider);
+        ref.read(inboxNotifierProvider.notifier).loadInbox();
+      }
+    } on DioException catch (exception) {
+      final status = exception.response?.statusCode;
+      if (mounted && status != null && status >= 400 && status < 500) {
+        setState(() { attempt = null; rejection = 'This update was rejected. Refresh EC progress and check your access.'; });
+      } else if (mounted) {
+        setState(() => failed = true);
+      }
+    } catch (_) {
+      if (mounted) setState(() => failed = true);
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = widget.entry['current_progress'];
+    final percentage = progress is Map ? (progress['percentage'] as num? ?? 0).toInt() : 0;
+    return Card(child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text((widget.entry['title'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(value: (percentage / 100).clamp(0.0, 1.0).toDouble()),
+        Row(children: [
+          Text('$percentage%'),
+          const Spacer(),
+          if (widget.canEdit && percentage < 100)
+            DropdownButton<int>(
+              value: percentage == 0 || percentage == 50 ? percentage : null,
+              hint: const Text('Change status'),
+              items: const [DropdownMenuItem(value: 0, child: Text('Not started')), DropdownMenuItem(value: 50, child: Text('In progress')), DropdownMenuItem(value: 100, child: Text('Completed'))],
+              onChanged: saving || failed || rejection != null ? null : (value) { if (value != null && value != percentage) save(value); },
+            ),
+          if (saving) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+          if (failed && widget.canEdit) TextButton(onPressed: () => save(attempt!['percentage'] as int, retry: true), child: const Text('Retry')),
+        ]),
+        if (rejection != null) TextButton(onPressed: () => ref.invalidate(ecProgressProvider(widget.page)), child: Text(rejection!)),
+      ]),
+    ));
+  }
+}
+
 class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
+  int _ecPage = 1;
   int _selectedVisitFilter = 0; // 0: All, 1: Open, 2: Check in, 3: Closed
   bool _isClockedIn = false;
   DateTime? _clockInTime;
+  final Set<int> _pendingTaskActions = {};
+  final Set<int> _uncertainTaskActions = {};
+
+  Future<void> _refreshTasks() async {
+    await ref.read(taskNotifierProvider.notifier).loadTasks();
+    if (mounted && ref.read(taskNotifierProvider).error == null) {
+      setState(() => _uncertainTaskActions.clear());
+    }
+  }
+
+  Future<void> _performTaskAction(TaskItemModel task) async {
+    if (_pendingTaskActions.contains(task.id) || _uncertainTaskActions.contains(task.id) || task.rowAction == null) return;
+    setState(() => _pendingTaskActions.add(task.id));
+    try {
+      final repository = ref.read(taskRepositoryProvider);
+      final success = task.rowAction == 'request_review'
+          ? await repository.requestReview(task.id)
+          : await repository.completeTask(task.id);
+      if (!mounted) return;
+      if (success) {
+        await ref.read(taskNotifierProvider.notifier).loadTasks();
+        if (mounted) {
+          ref.invalidate(_dashboardInboxProvider);
+          ref.read(inboxNotifierProvider.notifier).loadInbox();
+        }
+      } else {
+        setState(() => _uncertainTaskActions.add(task.id));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The update could not be confirmed. Refresh My Tasks before trying again.')));
+      }
+    } finally {
+      if (mounted) setState(() => _pendingTaskActions.remove(task.id));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     final userName = user?.name.split(' ').first ?? 'User';
     final taskState = ref.watch(taskNotifierProvider);
-    final inboxState = ref.watch(inboxNotifierProvider);
-    final ecProgress = ref.watch(_ecProgressProvider);
+    final dashboardInbox = ref.watch(_dashboardInboxProvider);
+    final inbox = dashboardInbox.valueOrNull;
+    final inboxState = InboxListState(
+      items: inbox?.items ?? const [],
+      incompleteCount: inbox?.incompleteCount,
+      completeCount: inbox?.completeCount,
+      isLoading: dashboardInbox.isLoading,
+      error: dashboardInbox.hasError ? inboxErrorMessage(dashboardInbox.error!) : null,
+    );
+    final ecProgress = ref.watch(ecProgressProvider(_ecPage));
     final visitTargetsAsync = ref.watch(visitTargetsNotifierProvider);
     final visitTargets = visitTargetsAsync.value ?? [];
 
     return Scaffold(
       backgroundColor: OrbitColors.scaffoldBackground,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: OrbitColors.primaryNavy,
+        foregroundColor: Colors.white,
+        onPressed: () async {
+          final isEc = await showModalBottomSheet<bool>(
+            context: context,
+            builder: (context) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+              ListTile(title: const Text('Create EC'), onTap: () => Navigator.pop(context, true)),
+              ListTile(title: const Text('Create task'), onTap: () => Navigator.pop(context, false)),
+            ])),
+          );
+          if (isEc == null || !context.mounted) return;
+          final created = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CreateWorkItemScreen(isEc: isEc)));
+          if (created == true && context.mounted) {
+            setState(() => _ecPage = 1);
+            ref.invalidate(ecProgressProvider(1));
+            ref.invalidate(_dashboardInboxProvider);
+            ref.read(taskNotifierProvider.notifier).loadTasks();
+            ref.read(inboxNotifierProvider.notifier).loadInbox();
+          }
+        },
+        child: const Icon(Icons.add),
+      ),
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
           color: OrbitColors.primaryNavy,
           onRefresh: () async {
-            await ref.read(taskNotifierProvider.notifier).loadTasks();
+            await _refreshTasks();
+            if (!mounted) return;
             await ref.read(inboxNotifierProvider.notifier).loadInbox();
-            ref.invalidate(_ecProgressProvider);
+            if (!mounted) return;
+            ref.invalidate(_dashboardInboxProvider);
+            ref.invalidate(ecProgressProvider(_ecPage));
             ref.invalidate(visitTargetsNotifierProvider);
           },
           child: SingleChildScrollView(
@@ -99,14 +243,26 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                 const SizedBox(height: 10),
                 ecProgress.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => TextButton(onPressed: () => ref.invalidate(_ecProgressProvider), child: const Text('Unable to load EC progress. Tap to retry.')),
-                  data: (items) => items.isEmpty
-                      ? const Text('No EC entries yet.')
-                      : Column(children: items.map((item) {
-                          final progress = item['current_progress'];
-                          final percentage = progress is Map ? (progress['percentage'] as num? ?? 0) : 0;
-                          return Card(child: ListTile(title: Text((item['title'] ?? '').toString()), subtitle: LinearProgressIndicator(value: (percentage / 100).clamp(0.0, 1.0).toDouble()), trailing: Text('$percentage%')));
-                        }).toList()),
+                  error: (_, __) => TextButton(onPressed: () => ref.invalidate(ecProgressProvider(_ecPage)), child: const Text('Unable to load EC progress. Tap to retry.')),
+                  data: (payload) {
+                    final items = payload['data'] as List;
+                    final meta = payload['meta'];
+                    final lastPage = meta is Map ? (meta['last_page'] as num? ?? 1).toInt() : 1;
+                    return Column(children: [
+                      if (items.isEmpty) const Text('No EC entries on this page.'),
+                      for (final item in items) _EcProgressRow(
+                        key: ValueKey(item['id']),
+                        entry: Map<String, dynamic>.from(item as Map),
+                        canEdit: payload['can_edit'] == true,
+                        page: _ecPage,
+                      ),
+                      if (lastPage > 1 || _ecPage > 1) Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        TextButton(onPressed: _ecPage > 1 ? () => setState(() => _ecPage--) : null, child: const Text('Previous')),
+                        Text('$_ecPage / $lastPage'),
+                        TextButton(onPressed: _ecPage < lastPage ? () => setState(() => _ecPage++) : null, child: const Text('Next')),
+                      ]),
+                    ]);
+                  },
                 ),
                 const SizedBox(height: 20),
 
@@ -133,7 +289,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
+        Expanded(child: Row(
           children: [
             Container(
               width: 32,
@@ -149,7 +305,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
               ),
             ),
             const SizedBox(width: 8),
-            RichText(
+            Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: RichText(
               text: const TextSpan(
                 children: [
                   TextSpan(
@@ -171,9 +327,9 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                   ),
                 ],
               ),
-            ),
+            ))),
           ],
-        ),
+        )),
         Row(
           children: [
             Stack(
@@ -498,25 +654,29 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           const SizedBox(width: 8),
           const Icon(Icons.tune_rounded, size: 16, color: OrbitColors.textMuted),
           const Spacer(),
-          Text(
+          Flexible(child: Text(
             nowFormatted,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: OrbitColors.textSecondary,
             ),
-          ),
+          )),
         ],
       ),
     );
   }
 
   Widget _buildScoreAndPerformanceRow(TaskListState taskState, InboxListState inboxState) {
-    final activeCount = taskState.tasks.length;
-    final totalInbox = inboxState.items.length;
-    final completedCount = taskState.tasks.where((t) => t.status == 'completed' || t.status == 'done').length;
-    final progressPercent = activeCount > 0 ? ((completedCount / activeCount) * 100).toInt() : 0;
-    final progressRatio = activeCount > 0 ? (completedCount / activeCount) : 0.0;
+    final activeCount = taskState.total;
+    final taskCountUnavailable = taskState.error != null || (taskState.isLoading && taskState.tasks.isEmpty);
+    final inboxCountUnavailable = inboxState.error != null || inboxState.incompleteCount == null || inboxState.completeCount == null;
+    final totalInbox = inboxState.incompleteCount ?? 0;
+    final completeInbox = inboxState.completeCount ?? 0;
+    final inboxCount = totalInbox + completeInbox;
+    final progressRatio = inboxCount > 0 ? completeInbox / inboxCount : 0.0;
 
     return Row(
       children: [
@@ -552,19 +712,21 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                       children: const [
                         Icon(Icons.assignment_turned_in_outlined, size: 15, color: Colors.white70),
                         SizedBox(width: 4),
-                        Text(
+                        Expanded(child: Text(
                           'Assigned Tasks',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
-                        ),
+                        )),
                       ],
                     ),
                     const Spacer(),
                     Text(
-                      '$activeCount',
+                      taskCountUnavailable ? '—' : '$activeCount',
                       style: const TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w900,
@@ -574,7 +736,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      activeCount == 0 ? 'No pending tasks' : '$activeCount tasks in queue',
+                      taskCountUnavailable ? (taskState.error != null ? 'Unable to load tasks' : 'Loading tasks…') : activeCount == 0 ? 'No assigned tasks' : '$activeCount assigned tasks',
                       style: const TextStyle(
                         fontSize: 11,
                         color: Colors.white70,
@@ -647,7 +809,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     Column(
                       children: [
                         Text(
-                          '$totalInbox',
+                          inboxCountUnavailable ? '—' : '$totalInbox',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -684,12 +846,12 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
+            Expanded(child: Row(
               children: [
                 const Icon(Icons.task_alt_rounded, size: 17, color: OrbitColors.textNavy),
                 const SizedBox(width: 6),
                 const Text(
-                  'Active Assigned Tasks',
+                  'My Tasks',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -704,7 +866,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    '${tasks.length}',
+                    '${taskState.total}',
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -713,7 +875,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                   ),
                 ),
               ],
-            ),
+            )),
             if (taskState.isLoading)
               const SizedBox(
                 width: 14,
@@ -723,7 +885,12 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           ],
         ),
         const SizedBox(height: 10),
-        if (tasks.isEmpty)
+        if (taskState.error != null)
+          TextButton(
+            onPressed: _refreshTasks,
+            child: const Text('Unable to load tasks. Tap to retry.'),
+          )
+        else if (tasks.isEmpty && !taskState.isLoading)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -733,21 +900,21 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
               border: Border.all(color: OrbitColors.cardBorder),
             ),
             child: Column(
-              children: const [
-                Icon(Icons.assignment_outlined, size: 36, color: OrbitColors.textMuted),
-                SizedBox(height: 8),
+              children: [
+                const Icon(Icons.assignment_outlined, size: 36, color: OrbitColors.textMuted),
+                const SizedBox(height: 8),
                 Text(
-                  'No assigned tasks right now',
-                  style: TextStyle(
+                  taskState.total > 0 ? 'No tasks loaded' : 'No assigned tasks right now',
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: OrbitColors.textNavy,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Tasks assigned to you will automatically appear here.',
-                  style: TextStyle(
+                  taskState.total > 0 ? 'Refresh to load assigned tasks.' : 'Tasks assigned to you will automatically appear here.',
+                  style: const TextStyle(
                     fontSize: 11,
                     color: OrbitColors.textSecondary,
                   ),
@@ -760,116 +927,47 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: min(5, tasks.length),
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemCount: tasks.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final task = tasks[index];
-              Color priorityColor = OrbitColors.kpiGreen;
-              Color priorityBg = OrbitColors.kpiGreenBg;
-              if (task.priority.toLowerCase() == 'urgent') {
-                priorityColor = OrbitColors.kpiRed;
-                priorityBg = OrbitColors.kpiRedBg;
-              } else if (task.priority.toLowerCase() == 'high') {
-                priorityColor = OrbitColors.kpiOrange;
-                priorityBg = OrbitColors.kpiOrangeBg;
-              }
-
+              final date = DateTime.tryParse(task.dueDate.split('T').first);
+              final actionLabel = task.rowAction == 'request_review' ? 'Request review' : 'Complete';
+              final unavailableReason = task.status == 'completed' ? 'Completed' : task.status == 'cancelled' ? 'Cancelled' : task.status == 'pending_review' || task.hasPendingReview ? 'Review already requested' : 'Completion is unavailable for your role or this task state';
               return Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: OrbitColors.cardBorder),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x04000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Tooltip(message: task.rowAction == null ? unavailableReason : '$actionLabel ${task.title}', child: Semantics(label: task.rowAction == null ? '$unavailableReason: ${task.title}' : '$actionLabel ${task.title}', child: Checkbox(
+                    value: task.status == 'completed',
+                    onChanged: task.rowAction == null || _pendingTaskActions.contains(task.id) || _uncertainTaskActions.contains(task.id)
+                        ? null : (value) { if (value == true) _performTaskAction(task); },
+                  ))),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    if (task.projectName != null && task.projectName!.isNotEmpty)
+                      Text(task.projectName!, style: const TextStyle(fontSize: 11, color: OrbitColors.textSecondary, fontWeight: FontWeight.w600)),
+                    InkWell(
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TaskDetailScreen(taskId: task.id))),
+                      child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(task.title, style: TextStyle(fontSize: 14, color: OrbitColors.textNavy, decoration: task.status == 'completed' ? TextDecoration.lineThrough : null))),
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: priorityBg,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            task.priority.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              color: priorityColor,
-                            ),
-                          ),
-                        ),
-                        if (task.dueDate.isNotEmpty)
-                          Row(
-                            children: [
-                              const Icon(Icons.calendar_today_rounded, size: 11, color: OrbitColors.textMuted),
-                              const SizedBox(width: 4),
-                              Text(
-                                task.dueDate,
-                                style: const TextStyle(fontSize: 11, color: OrbitColors.textMuted),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      task.title,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: OrbitColors.textNavy,
-                      ),
-                    ),
-                    if (task.description.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        task.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: OrbitColors.textSecondary,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: LinearProgressIndicator(
-                              value: (task.progressPercent / 100.0).clamp(0.0, 1.0),
-                              minHeight: 5,
-                              backgroundColor: OrbitColors.scaffoldBackground,
-                              valueColor: const AlwaysStoppedAnimation<Color>(OrbitColors.brandOrange),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${task.progressPercent}%',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: OrbitColors.textNavy),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                    Wrap(spacing: 4, runSpacing: 4, children: [
+                      for (final assignee in task.assignees)
+                        Chip(label: Text(assignee), visualDensity: VisualDensity.compact),
+                      if (date != null)
+                        Chip(avatar: const Icon(Icons.calendar_today_outlined, size: 14), label: Text(DateFormat('EEE, MMM d').format(date)), visualDensity: VisualDensity.compact),
+                      if (task.status == 'pending_review' || task.hasPendingReview)
+                        const Chip(label: Text('Pending review'), visualDensity: VisualDensity.compact),
+                    ]),
+                  ])),
+                ]),
               );
             },
           ),
+        if (taskState.page < taskState.lastPage && taskState.error == null)
+          Center(child: TextButton(
+            onPressed: taskState.isLoadingMore ? null : () => ref.read(taskNotifierProvider.notifier).loadMore(),
+            child: Text(taskState.isLoadingMore ? 'Loading…' : taskState.loadMoreError != null ? 'Unable to load more. Retry' : 'Load more tasks'),
+          )),
       ],
     );
   }
@@ -883,18 +981,20 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
+            Expanded(child: Row(
               children: [
                 const Icon(Icons.mark_email_unread_outlined, size: 17, color: OrbitColors.textNavy),
                 const SizedBox(width: 6),
-                const Text(
+                const Flexible(child: Text(
                   'Unified Inbox & Approvals',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: OrbitColors.textNavy,
                   ),
-                ),
+                )),
                 const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
@@ -903,7 +1003,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    '${items.length}',
+                    inboxState.isLoading || inboxState.error != null || inboxState.incompleteCount == null ? '—' : '${inboxState.incompleteCount}',
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -912,7 +1012,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                   ),
                 ),
               ],
-            ),
+            )),
             if (inboxState.isLoading)
               const SizedBox(
                 width: 14,
@@ -922,7 +1022,12 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           ],
         ),
         const SizedBox(height: 10),
-        if (items.isEmpty)
+        if (inboxState.error != null)
+          TextButton(
+            onPressed: () => ref.invalidate(_dashboardInboxProvider),
+            child: Text('${inboxState.error} Tap to retry.'),
+          )
+        else if (items.isEmpty && !inboxState.isLoading)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
@@ -932,21 +1037,21 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
               border: Border.all(color: OrbitColors.cardBorder),
             ),
             child: Column(
-              children: const [
-                Icon(Icons.inbox_outlined, size: 36, color: OrbitColors.textMuted),
-                SizedBox(height: 8),
+              children: [
+                const Icon(Icons.inbox_outlined, size: 36, color: OrbitColors.textMuted),
+                const SizedBox(height: 8),
                 Text(
-                  'All caught up!',
-                  style: TextStyle(
+                  (inboxState.incompleteCount ?? 0) > 0 ? 'No items loaded' : 'All caught up!',
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: OrbitColors.textNavy,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'No pending approvals or unread notifications.',
-                  style: TextStyle(
+                  (inboxState.incompleteCount ?? 0) > 0 ? 'Refresh to load pending items.' : 'No pending approvals or unread notifications.',
+                  style: const TextStyle(
                     fontSize: 11,
                     color: OrbitColors.textSecondary,
                   ),

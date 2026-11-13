@@ -46,6 +46,7 @@ class ApiClient {
                 path.startsWith('/projects') ||
                 path.startsWith('/ec') ||
                 path.startsWith('/conversations') ||
+                path.startsWith('/collaboration') ||
                 path.startsWith('/employee-chat') ||
                 path.startsWith('/visit') ||
                 path.startsWith('/check-ins') ||

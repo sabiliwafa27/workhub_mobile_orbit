@@ -153,6 +153,11 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: _buildTaskCard(task),
                   )),
+            if (taskState.page < taskState.lastPage && taskState.error == null)
+              Center(child: TextButton(
+                onPressed: taskState.isLoadingMore ? null : () => ref.read(taskNotifierProvider.notifier).loadMore(),
+                child: Text(taskState.isLoadingMore ? 'Loading…' : taskState.loadMoreError != null ? 'Unable to load more. Retry' : 'Load more tasks'),
+              )),
           ],
         ),
       ),
