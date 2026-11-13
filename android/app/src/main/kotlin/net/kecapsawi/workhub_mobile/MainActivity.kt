@@ -1,5 +1,5 @@
 package net.kecapsawi.workhub_mobile
 
-import io.flutter.embedding.android.FlutterFragmentActivity
+import io.flutter.embedding.android.FlutterActivity
 
-class MainActivity : FlutterFragmentActivity()
+class MainActivity : FlutterActivity()

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../../../core/navigation/home_navigation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/realtime/reverb_service.dart';
 import '../../../core/theme/orbit_theme.dart';
-import '../../../core/theme/orbit_motion.dart';
+import '../../../core/widgets/workhub_navigation_bar.dart';
 import '../../../core/updater/app_updater_service.dart';
 import '../../../core/updater/update_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chat/screens/chat_list_screen.dart';
+import '../../chat/screens/employee_chat_screen.dart';
+import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
 import '../../projects/screens/projects_screen.dart';
 import '../../tasks/screens/task_screen.dart';
@@ -27,7 +27,6 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
   @override
   void initState() {
     super.initState();
-    homeRequests.addListener(_returnHome);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(reverbServiceProvider).connect();
     });
@@ -37,46 +36,10 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     setState(() => _currentIndex = index);
   }
 
-  void _returnHome() {
-    if (mounted) setState(() => _currentIndex = 0);
-  }
-
-  @override
-  void dispose() {
-    homeRequests.removeListener(_returnHome);
-    super.dispose();
-  }
-
-  bool _confirmingExit = false;
-  Future<void> _back() async {
-    if (_currentIndex != 0) {
-      _returnHome();
-      return;
-    }
-    if (_confirmingExit) return;
-    _confirmingExit = true;
-    final quit = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-              title: const Text('Quit Orbit?'),
-              content: const Text('Are you sure you want to quit Orbit?'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel')),
-                FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Quit'))
-              ],
-            ));
-    _confirmingExit = false;
-    if (quit == true) await SystemNavigator.pop();
-  }
-
   void _showQuickActionSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: OrbitColors.cardSurface,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -152,11 +115,11 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10372C),
+                    color: const Color(0xFFD1FAE5),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.chat_bubble_outline_rounded,
-                      color: Color(0xFF34D399)),
+                      color: Color(0xFF059669)),
                 ),
                 title: const Text('Customer Discussion',
                     style: TextStyle(fontWeight: FontWeight.w700)),
@@ -201,7 +164,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
           content: Text(message),
           backgroundColor: shorebird == ShorebirdUpdateResult.failed
               ? null
-              : OrbitColors.primaryNavyDark));
+              : OrbitColors.kpiGreen));
       return;
     }
     final release = await updater.checkForUpdate();
@@ -217,7 +180,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('You are using the latest version.'),
-          backgroundColor: OrbitColors.primaryNavyDark,
+          backgroundColor: OrbitColors.kpiGreen,
         ),
       );
     }
@@ -228,7 +191,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: OrbitColors.cardSurface,
+        backgroundColor: Colors.white,
         title: const Text(
           'My Profile',
           style: TextStyle(
@@ -241,7 +204,7 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
             Center(
               child: CircleAvatar(
                 radius: 36,
-                backgroundColor: OrbitColors.primaryNavyDark,
+                backgroundColor: OrbitColors.bubbleBlue,
                 child: Text(
                   user?.name.isNotEmpty == true
                       ? user!.name[0].toUpperCase()
@@ -266,14 +229,6 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _checkForUpdates();
-            },
-            child: const Text('Check Updates',
-                style: TextStyle(color: OrbitColors.primaryNavy)),
-          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Close',
@@ -351,193 +306,29 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final inboxCount = ref.watch(inboxNotifierProvider).items.length;
+
     final pages = [
       OrbitDashboardView(
         onOpenSearch: () => setState(() => _currentIndex = 2),
-        onOpenNotifications: () => setState(() => _currentIndex = 4),
-        onOpenTasks: () => setState(() => _currentIndex = 2),
-        onOpenProjects: () => setState(() => _currentIndex = 3),
-        onOpenErp: () => setState(() => _currentIndex = 4),
-        onOpenProfile: _showProfileDialog,
+        onOpenNotifications: () => setState(() => _currentIndex = 1),
         onOpenCheckIn: _showQuickActionSheet,
       ),
-      const ChatListScreen(),
-      TaskScreen(
-          onOpenNotifications: () => setState(() => _currentIndex = 4),
-          onOpenProfile: _showProfileDialog),
+      const InboxScreen(),
+      const EmployeeChatScreen(),
       const ProjectsScreen(),
-      InboxScreen(isActive: _currentIndex == 4),
     ];
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness:
-              _currentIndex == 0 ? Brightness.light : Brightness.dark,
-          systemNavigationBarColor: OrbitColors.scaffoldBackground,
-          systemNavigationBarIconBrightness: Brightness.dark,
-        ),
-        child: PopScope(
-          canPop: false,
-          onPopInvokedWithResult: (didPop, result) {
-            if (!didPop) _back();
-          },
-          child: Scaffold(
-            extendBody: _currentIndex == 0,
-            backgroundColor: Colors.transparent,
-            body: IndexedStack(
-              index: _currentIndex,
-              children: [
-                for (var i = 0; i < pages.length; i++)
-                  TickerMode(
-                    enabled: _currentIndex == i,
-                    child: OrbitEntrance(
-                      key: ValueKey(i),
-                      active: _currentIndex == i,
-                      child: pages[i],
-                    ),
-                  ),
-              ],
-            ),
-            bottomNavigationBar:
-                SafeArea(top: false, child: _buildFloatingBottomNav()),
-          ),
-        ));
-  }
-
-  Widget _buildFloatingBottomNav() {
-    return Container(
-      key: const ValueKey('orbit-bottom-navigation'),
-      margin: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
-      height:
-          64 + (MediaQuery.textScalerOf(context).scale(10) - 10).clamp(0, 24),
-      decoration: BoxDecoration(
-        color: OrbitColors.cardSurface,
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: OrbitColors.cardBorder),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1206244D),
-            blurRadius: 18,
-            offset: Offset(0, 6),
-          ),
-        ],
+    return Scaffold(
+      backgroundColor: OrbitColors.scaffoldBackground,
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          // 1. Home
-          _buildNavItem(
-            index: 0,
-            icon: Icons.home_rounded,
-            label: 'Home',
-          ),
-
-          // 2. Inbox (with live count badge)
-          _buildNavItem(
-            index: 1,
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Chat',
-          ),
-
-          // 3. Tasks
-          _buildNavItem(
-            index: 2,
-            icon: Icons.task_alt_rounded,
-            label: 'Tasks',
-          ),
-
-          // 5. Discussions / Profile
-          _buildNavItem(
-            index: 3,
-            icon: Icons.folder_outlined,
-            label: 'Projects',
-          ),
-          _buildNavItem(index: 4, icon: Icons.grid_view_rounded, label: 'ERP'),
-        ],
-      ),
+      bottomNavigationBar: WorkHubNavigationBar(
+          selectedIndex: _currentIndex,
+          inboxCount: inboxCount,
+          onSelected: _onBottomNavTapped),
     );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-    int? badgeCount,
-  }) {
-    final isSelected = _currentIndex == index;
-    return Expanded(
-        child: InkWell(
-      onTap: () => _onBottomNavTapped(index),
-      borderRadius: BorderRadius.circular(999),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        child: AnimatedContainer(
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            color: isSelected ? OrbitColors.bubbleBlue : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(
-                    icon,
-                    size: 24,
-                    color: isSelected
-                        ? OrbitColors.navActive
-                        : OrbitColors.navInactive,
-                  ),
-                  if (badgeCount != null)
-                    Positioned(
-                      top: -4,
-                      right: -10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: OrbitColors.accentCoral,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        constraints:
-                            const BoxConstraints(minWidth: 16, minHeight: 14),
-                        child: Text(
-                          badgeCount > 99 ? '99+' : badgeCount.toString(),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected
-                      ? OrbitColors.navActive
-                      : OrbitColors.navInactive,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ));
   }
 }
