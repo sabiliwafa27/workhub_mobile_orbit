@@ -9,6 +9,7 @@ import '../../tasks/screens/task_detail_screen.dart';
 import '../../tasks/providers/task_provider.dart';
 import '../../tasks/providers/ec_progress_provider.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../chat/screens/employee_chat_screen.dart';
 import 'ec_inbox_detail_screen.dart';
 import 'discussion_panel.dart';
 import 'logistic_out_detail_screen.dart';
@@ -35,7 +36,8 @@ final _logisticInMentionCapability = FutureProvider.autoDispose.family<bool, int
 });
 
 class InboxScreen extends ConsumerStatefulWidget {
-  const InboxScreen({super.key});
+  final bool isActive;
+  const InboxScreen({super.key, this.isActive = true});
 
   @override
   ConsumerState<InboxScreen> createState() => _InboxScreenState();
@@ -48,6 +50,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   String _search = '';
   bool _unreadOnly = false;
   Timer? _searchTimer;
+  Timer? _refreshTimer;
   late final TextEditingController _searchController;
 
   @override
@@ -57,11 +60,28 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     _view = state.status;
     _search = state.search;
     _searchController = TextEditingController(text: _search);
+    _syncRefreshTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant InboxScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) _syncRefreshTimer();
+  }
+
+  void _syncRefreshTimer() {
+    _refreshTimer?.cancel();
+    if (widget.isActive) {
+      _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+        if (mounted) ref.read(inboxNotifierProvider.notifier).loadInbox();
+      });
+    }
   }
 
   @override
   void dispose() {
     _searchTimer?.cancel();
+    _refreshTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -184,6 +204,17 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                     },
                     icon: const Icon(Icons.filter_alt_off_outlined), label: const Text('Reset filters'),
                   )),
+                if (inboxState.chatError != null && _selectedSource != 'employee-chat')
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Chats are unavailable. Select Chats to retry.',
+                        style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                      ),
+                    ),
+                  ),
               ]),
             ),
 
@@ -200,6 +231,21 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                           TextButton(
                             onPressed: () => ref.read(inboxNotifierProvider.notifier).loadInbox(),
                             child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _selectedSource == 'employee-chat' && inboxState.chatError != null
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(inboxState.chatError!, textAlign: TextAlign.center),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: () => ref.read(inboxNotifierProvider.notifier).loadInbox(),
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Retry'),
                           ),
                         ],
                       ),
@@ -236,12 +282,24 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   Widget _buildInboxCard(InboxItemModel item) {
     final isGuest = item.moduleCode == 'guest-book' || item.subjectType == 'guest';
     final name = item.title.replaceFirst(RegExp(r'^Guest:\s*'), '').trim();
-    final icon = item.source.contains('logistic') ? Icons.local_shipping_outlined
+    final icon = item.moduleCode == 'employee-chat' ? Icons.chat_bubble_outline_rounded
+        : item.source.contains('logistic') ? Icons.local_shipping_outlined
         : item.source.contains('fleet') ? Icons.directions_car_outlined
         : item.source.contains('sales') ? Icons.receipt_long_outlined
         : item.kind == 'mention' ? Icons.alternate_email : Icons.task_alt_outlined;
     return Material(color: Colors.white, child: InkWell(
       onTap: () {
+        if (item.moduleCode == 'employee-chat') {
+          final conversationId = int.tryParse(item.subjectKey ?? '');
+          if (conversationId == null) return;
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => EmployeeMessagesScreen(
+            id: conversationId,
+            name: item.title,
+          ))).then((_) {
+            if (mounted) ref.read(inboxNotifierProvider.notifier).loadInbox();
+          });
+          return;
+        }
         final identity = item.readIdentity;
         if (item.isUnread && (identity != null || item.unreadMentionNotificationIds.isNotEmpty)) {
           () async {

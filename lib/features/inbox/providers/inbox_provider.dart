@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/realtime/reverb_service.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../chat/providers/chat_provider.dart';
 import '../models/inbox_item_model.dart';
 
 final inboxRepositoryProvider = Provider<InboxRepository>((ref) {
@@ -119,6 +120,7 @@ class InboxListState {
   final Map<String, String> sources;
   final Map<String, List<int>> sourceCounts;
   final bool sourceCountsComplete;
+  final String? chatError;
   final String status;
   final String search;
 
@@ -135,6 +137,7 @@ class InboxListState {
     this.sources = const {},
     this.sourceCounts = const {},
     this.sourceCountsComplete = false,
+    this.chatError,
     this.status = 'pending',
     this.search = '',
   });
@@ -152,6 +155,7 @@ class InboxListState {
     Map<String, String>? sources,
     Map<String, List<int>>? sourceCounts,
     bool? sourceCountsComplete,
+    String? chatError,
     String? status,
     String? search,
   }) {
@@ -168,6 +172,7 @@ class InboxListState {
       sources: sources ?? this.sources,
       sourceCounts: sourceCounts ?? this.sourceCounts,
       sourceCountsComplete: sourceCountsComplete ?? this.sourceCountsComplete,
+      chatError: chatError,
       status: status ?? this.status,
       search: search ?? this.search,
     );
@@ -177,13 +182,14 @@ class InboxListState {
 class InboxNotifier extends StateNotifier<InboxListState> {
   final InboxRepository _repo;
   final ReverbRealtimeService _reverb;
+  final EmployeeChatRepository? _employeeChats;
   final int? _userId;
   String _status = 'pending';
   String _search = '';
   int _requestNumber = 0;
   final List<void Function()> _cancelRealtimeSubscriptions = [];
 
-  InboxNotifier(this._repo, this._reverb, this._userId) : super(InboxListState()) {
+  InboxNotifier(this._repo, this._reverb, this._userId, [this._employeeChats]) : super(InboxListState()) {
     loadInbox();
     _setupRealtime();
   }
@@ -192,17 +198,82 @@ class InboxNotifier extends StateNotifier<InboxListState> {
     _status = status ?? _status;
     _search = search ?? _search;
     final requestNumber = ++_requestNumber;
-    state = state.copyWith(isLoading: true, error: null, status: _status, search: _search);
+    state = state.copyWith(isLoading: true, error: null, chatError: null, status: _status, search: _search);
     try {
       final todos = await _repo.fetchTodos(status: _status, search: _search);
       if (!mounted || requestNumber != _requestNumber) return;
-      state = InboxListState(items: todos.items, incompleteCount: todos.incompleteCount, completeCount: todos.completeCount,
-          incompleteUnreadCount: todos.incompleteUnreadCount, completeUnreadCount: todos.completeUnreadCount, sources: todos.sources, sourceCounts: todos.sourceCounts, sourceCountsComplete: todos.sourceCountsComplete,
-          guestActions: todos.guestActions, canCompleteComment: todos.canCompleteComment, isLoading: false, status: _status, search: _search);
+      String? chatError;
+      var allChats = <InboxItemModel>[];
+      if (_employeeChats != null) {
+        try {
+          allChats = (await _employeeChats.fetchConversations())
+              .map(_employeeChatInboxItem)
+              .where((item) => _search.isEmpty ||
+                  item.title.toLowerCase().contains(_search.toLowerCase()) ||
+                  (item.subtitle ?? '').toLowerCase().contains(_search.toLowerCase()))
+              .toList();
+        } catch (_) {
+          chatError = 'Unable to load chats. Please try again.';
+        }
+      }
+
+      final unreadChats = allChats.where((item) => item.isUnread).length;
+      final sourceCounts = Map<String, List<int>>.from(todos.sourceCounts);
+      if (chatError == null) {
+        sourceCounts['employee-chat'] = [allChats.length, 0, unreadChats, 0];
+      }
+      final sources = <String, String>{...todos.sources, 'employee-chat': 'Chats'};
+      final visibleChats = _status == 'complete' ? const <InboxItemModel>[] : allChats;
+      state = InboxListState(
+        items: [...todos.items, ...visibleChats],
+        incompleteCount: todos.incompleteCount == null || chatError != null
+            ? todos.incompleteCount
+            : todos.incompleteCount! + allChats.length,
+        completeCount: todos.completeCount,
+        incompleteUnreadCount: todos.incompleteUnreadCount == null || chatError != null
+            ? todos.incompleteUnreadCount
+            : todos.incompleteUnreadCount! + unreadChats,
+        completeUnreadCount: todos.completeUnreadCount,
+        sources: sources,
+        sourceCounts: sourceCounts,
+        sourceCountsComplete: todos.sourceCountsComplete,
+        chatError: chatError,
+        guestActions: todos.guestActions,
+        canCompleteComment: todos.canCompleteComment,
+        isLoading: false,
+        status: _status,
+        search: _search,
+      );
     } catch (e) {
       if (!mounted || requestNumber != _requestNumber) return;
       state = state.copyWith(isLoading: false, error: inboxErrorMessage(e));
     }
+  }
+
+  InboxItemModel _employeeChatInboxItem(Map<String, dynamic> row) {
+    final id = row['id']?.toString() ?? '';
+    final name = (row['name'] ?? 'Chat').toString();
+    final preview = (row['latest_message'] ?? '').toString().trim();
+    final updatedAt = (row['updated_at'] ?? '').toString();
+    final unreadCount = (row['unread_count'] as num?)?.toInt() ?? 0;
+    return InboxItemModel(
+      id: 'employee-chat:$id',
+      title: name,
+      source: 'employee-chat',
+      sourceLabel: 'Chats',
+      status: 'open',
+      createdAt: updatedAt,
+      updatedAt: updatedAt.isEmpty ? null : updatedAt,
+      sortAt: updatedAt.isEmpty ? null : updatedAt,
+      subtitle: preview.isEmpty ? 'No messages yet' : preview,
+      isUnread: unreadCount > 0,
+      unreadCount: unreadCount,
+      displayAt: updatedAt,
+      subjectKey: id,
+      moduleCode: 'employee-chat',
+      subjectType: 'employee_chat',
+      kind: 'employee-chat',
+    );
   }
 
   Future<bool> completeItem(InboxItemModel item) async {
@@ -238,6 +309,7 @@ class InboxNotifier extends StateNotifier<InboxListState> {
 final inboxNotifierProvider = StateNotifierProvider<InboxNotifier, InboxListState>((ref) {
   final repo = ref.watch(inboxRepositoryProvider);
   final reverb = ref.watch(reverbServiceProvider);
+  final employeeChats = ref.watch(employeeChatRepositoryProvider);
   final user = ref.watch(authProvider).user;
-  return InboxNotifier(repo, reverb, user?.id);
+  return InboxNotifier(repo, reverb, user?.id, employeeChats);
 });

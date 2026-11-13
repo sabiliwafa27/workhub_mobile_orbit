@@ -9,6 +9,28 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepository(apiClient);
 });
 
+final employeeChatRepositoryProvider = Provider<EmployeeChatRepository>((ref) {
+  return EmployeeChatRepository(ref.watch(apiClientProvider));
+});
+
+class EmployeeChatRepository {
+  final ApiClient _apiClient;
+
+  EmployeeChatRepository(this._apiClient);
+
+  Future<List<Map<String, dynamic>>> fetchConversations() async {
+    final response = await _apiClient.dio.get('/employee-chat/conversations');
+    final data = response.data;
+    if (data is! Map || data['data'] is! List) {
+      throw const FormatException('Unexpected employee chat response');
+    }
+    return (data['data'] as List)
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
+}
+
 class ChatRepository {
   final ApiClient _apiClient;
 

@@ -6,7 +6,6 @@ import '../../../core/updater/app_updater_service.dart';
 import '../../../core/updater/update_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chat/screens/chat_list_screen.dart';
-import '../../chat/screens/employee_chat_screen.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
 import '../../projects/screens/projects_screen.dart';
@@ -280,8 +279,8 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
         onOpenNotifications: () => setState(() => _currentIndex = 1),
         onOpenCheckIn: _showQuickActionSheet,
       ),
-      const InboxScreen(),
-      const EmployeeChatScreen(),
+      InboxScreen(isActive: _currentIndex == 1),
+      const TaskScreen(),
       const ProjectsScreen(),
     ];
 
@@ -329,11 +328,11 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
             badgeCount: inboxCount > 0 ? inboxCount : null,
           ),
 
-          // 4. Tasks
+          // 3. Tasks
           _buildNavItem(
             index: 2,
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Chat',
+            icon: Icons.task_alt_rounded,
+            label: 'Tasks',
           ),
 
           // 5. Discussions / Profile

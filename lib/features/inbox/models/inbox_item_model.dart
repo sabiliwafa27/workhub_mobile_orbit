@@ -59,6 +59,7 @@ class InboxItemModel {
   }
 
   String get filterSourceLabel => switch (filterSource) {
+    'employee-chat' => 'Chats',
     'guest-book' => 'Guests',
     'logistic-in' => 'Logistic In',
     'logistic-arrival' => 'Logistic Arrival',
