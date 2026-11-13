@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../network/api_client.dart';
+import '../../features/auth/providers/auth_provider.dart';
 
 final reverbServiceProvider = Provider<ReverbRealtimeService>((ref) {
   final service = ReverbRealtimeService(ref.watch(apiClientProvider));
