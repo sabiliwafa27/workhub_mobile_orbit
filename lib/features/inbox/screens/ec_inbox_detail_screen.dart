@@ -104,7 +104,11 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
         final history = detail['progress_history'] is List ? detail['progress_history'] as List : const [];
         final current = detail['current_progress'];
         final progress = current is Map ? (current['percentage'] as num? ?? 0).toDouble() : 0.0;
-        return ListView(cacheExtent: 4000, padding: const EdgeInsets.all(16), children: [
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -151,7 +155,9 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
           ]),
           const SizedBox(height: 8),
           InboxDiscussion(module: 'workhub_ec', subjectKey: widget.entryId),
-        ]);
+            ],
+          ),
+        );
       },
     ),
   );
