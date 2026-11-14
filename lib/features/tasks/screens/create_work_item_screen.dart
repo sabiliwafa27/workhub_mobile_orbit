@@ -9,8 +9,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../home/providers/dashboard_provider.dart';
-import '../providers/task_provider.dart';
 
 DateTime standardTaskDueDate(DateTime now) =>
     DateTime(now.year, now.month, now.day + 2);
@@ -776,11 +774,6 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
           });
         return;
       }
-      if (!widget.isEc) {
-        ref.read(taskNotifierProvider.notifier).loadTasks();
-        ref.invalidate(dashboardTasksProvider);
-        ref.invalidate(dashboardTaskStatsProvider);
-      }
       if (mounted) Navigator.pop(context, true);
     } on DioException catch (exception) {
       final data = exception.response?.data;
@@ -857,11 +850,6 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
                 'The result could not be confirmed. Check My Tasks before creating this task again.';
           });
         return;
-      }
-      if (!widget.isEc) {
-        ref.read(taskNotifierProvider.notifier).loadTasks();
-        ref.invalidate(dashboardTasksProvider);
-        ref.invalidate(dashboardTaskStatsProvider);
       }
       if (mounted) Navigator.pop(context, true);
     } on DioException catch (exception) {

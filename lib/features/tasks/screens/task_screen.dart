@@ -28,7 +28,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   final _scrollController = ScrollController();
   final _busyTasks = <int>{};
   bool _showFilters = false;
-  TaskBoardPeriod _period = TaskBoardPeriod.month;
+  TaskBoardPeriod _period = TaskBoardPeriod.today;
   String _status = 'all';
   String _priority = '';
   DateTimeRange? _dateRange;
@@ -44,7 +44,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     _priorityFuture = ref.read(taskRepositoryProvider).fetchPriorities();
     _ideasFuture = _loadIdeas('');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _selectPeriod(TaskBoardPeriod.month);
+      if (mounted) _selectPeriod(TaskBoardPeriod.today);
     });
   }
 
@@ -223,7 +223,23 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     final taskState = ref.watch(taskNotifierProvider);
     final user = ref.watch(authProvider).user;
     final canManageEc = user?.can('task.ec.manage') == true;
-    final tasks = taskState.tasks;
+    final showAll = _period == TaskBoardPeriod.all || _status != 'all';
+    final tasks = (showAll || taskState.scope == TaskScope.delegatedByMe)
+        ? taskState.tasks
+        : taskState.tasks
+            .where((task) =>
+                task.status != 'completed' && task.status != 'cancelled')
+            .toList();
+    final String boardTitle;
+    if (taskState.isLoading) {
+      boardTitle = 'Loading tasks…';
+    } else if (taskState.scope == TaskScope.delegatedByMe) {
+      boardTitle = 'Delegated Tasks (${tasks.length})';
+    } else if (showAll) {
+      boardTitle = 'Tasks (${taskState.total})';
+    } else {
+      boardTitle = 'Active Tasks (${tasks.length})';
+    }
     final unread =
         ref.watch(inboxNotifierProvider).items.any((item) => item.isUnread);
     final photo = user?.profilePhotoUrl;
@@ -364,15 +380,16 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                     child: Row(children: [
                       Expanded(
                           child: Semantics(
-                              selected: taskState.scope == TaskScope.assignedToMe,
+                              selected:
+                                  taskState.scope == TaskScope.assignedToMe,
                               button: true,
                               child: InkWell(
                                   onTap: () =>
                                       _selectScope(TaskScope.assignedToMe),
                                   borderRadius: BorderRadius.circular(99),
                                   child: AnimatedContainer(
-                                      duration: MediaQuery
-                                              .disableAnimationsOf(context)
+                                      duration: MediaQuery.disableAnimationsOf(
+                                              context)
                                           ? Duration.zero
                                           : const Duration(milliseconds: 220),
                                       padding: const EdgeInsets.symmetric(
@@ -393,29 +410,35 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                                                 size: 15,
                                                 color: Colors.white),
                                             const SizedBox(width: 5),
-                                            Text('Assigned to Me',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: taskState
-                                                                .scope ==
-                                                            TaskScope
-                                                                .assignedToMe
-                                                        ? FontWeight.w700
-                                                        : FontWeight.w400,
-                                                    color: Colors.white)),
+                                            Flexible(
+                                              child: Text('Assigned to Me',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: taskState
+                                                                  .scope ==
+                                                              TaskScope
+                                                                  .assignedToMe
+                                                          ? FontWeight.w700
+                                                          : FontWeight.w400,
+                                                      color: Colors.white)),
+                                            ),
                                           ]))))),
                       Expanded(
                           child: Semantics(
-                              selected: taskState.scope == TaskScope.delegatedByMe,
+                              selected:
+                                  taskState.scope == TaskScope.delegatedByMe,
                               button: true,
                               child: InkWell(
                                   onTap: () =>
                                       _selectScope(TaskScope.delegatedByMe),
                                   borderRadius: BorderRadius.circular(99),
                                   child: AnimatedContainer(
-                                      duration: MediaQuery
-                                              .disableAnimationsOf(context)
+                                      duration: MediaQuery.disableAnimationsOf(
+                                              context)
                                           ? Duration.zero
                                           : const Duration(milliseconds: 220),
                                       padding: const EdgeInsets.symmetric(
@@ -436,17 +459,22 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                                                 size: 15,
                                                 color: Colors.white),
                                             const SizedBox(width: 5),
-                                            Text('Delegated by Me',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: taskState
-                                                                .scope ==
-                                                            TaskScope
-                                                                .delegatedByMe
-                                                        ? FontWeight.w700
-                                                        : FontWeight.w400,
-                                                    color: Colors.white)),
+                                            Flexible(
+                                              child: Text('Delegated by Me',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: taskState
+                                                                  .scope ==
+                                                              TaskScope
+                                                                  .delegatedByMe
+                                                          ? FontWeight.w700
+                                                          : FontWeight.w400,
+                                                      color: Colors.white)),
+                                            ),
                                           ]))))),
                     ])),
                 const SizedBox(height: 8),
@@ -741,7 +769,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                                     child: Text(
                                         taskState.isLoading
                                             ? 'Loading tasks…'
-                                            : '${taskState.scope == TaskScope.delegatedByMe ? "Delegated Tasks" : "Tasks"} (${tasks.length})',
+                                            : boardTitle,
                                         style: const TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.w700,

@@ -176,7 +176,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   int _ecPage = 1;
   bool _showEc = false;
   int _selectedVisitFilter = 0; // 0: All, 1: Open, 2: Check in, 3: Closed
-  DashboardPeriod _period = DashboardPeriod.month;
+  DashboardPeriod _period = DashboardPeriod.today;
 
   void _openTasks() => (widget.onOpenTasks ?? widget.onOpenSearch)();
 
