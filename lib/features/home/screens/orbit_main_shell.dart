@@ -3,11 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/realtime/reverb_service.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../../../core/widgets/workhub_navigation_bar.dart';
-import '../../../core/updater/app_updater_service.dart';
-import '../../../core/updater/update_dialog.dart';
-import '../../auth/providers/auth_provider.dart';
 import '../../chat/screens/chat_list_screen.dart';
-import '../../chat/screens/employee_chat_screen.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
 import '../../projects/screens/projects_screen.dart';
@@ -139,171 +135,6 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
     );
   }
 
-  void _checkForUpdates() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Checking for updates...'),
-        duration: Duration(seconds: 1),
-      ),
-    );
-    final updater = AppUpdaterService();
-    final shorebird = await updater.checkForShorebirdUpdate();
-    if (!mounted) return;
-    if (shorebird != ShorebirdUpdateResult.unavailable) {
-      final message = switch (shorebird) {
-        ShorebirdUpdateResult.upToDate => 'You are using the latest version.',
-        ShorebirdUpdateResult.downloaded =>
-          'Update downloaded. Close and reopen WorkHub to use it.',
-        ShorebirdUpdateResult.restartRequired =>
-          'An update is ready. Close and reopen WorkHub to apply it.',
-        ShorebirdUpdateResult.failed =>
-          'Unable to check or download the update. Please try again.',
-        ShorebirdUpdateResult.unavailable => '',
-      };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(message),
-          backgroundColor: shorebird == ShorebirdUpdateResult.failed
-              ? null
-              : OrbitColors.kpiGreen));
-      return;
-    }
-    final release = await updater.checkForUpdate();
-    if (!mounted) return;
-
-    if (release != null && release.hasUpdate) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => UpdateDialog(releaseInfo: release),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You are using the latest version.'),
-          backgroundColor: OrbitColors.kpiGreen,
-        ),
-      );
-    }
-  }
-
-  void _showProfileDialog() {
-    final user = ref.read(authProvider).user;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text(
-          'My Profile',
-          style: TextStyle(
-              color: OrbitColors.textNavy, fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: CircleAvatar(
-                radius: 36,
-                backgroundColor: OrbitColors.bubbleBlue,
-                child: Text(
-                  user?.name.isNotEmpty == true
-                      ? user!.name[0].toUpperCase()
-                      : 'U',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: OrbitColors.primaryNavy,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildProfileRow('Full Name', user?.name ?? '-'),
-            _buildProfileRow('Username', user?.username ?? '-'),
-            _buildProfileRow('Email', user?.email ?? '-'),
-            _buildProfileRow('Job Title', user?.title ?? '-'),
-            _buildProfileRow('Department', user?.department ?? '-'),
-            _buildProfileRow('Employee Code', user?.employeeCode ?? '-'),
-            _buildProfileRow(
-                'Employee ID', user?.employeeId?.toString() ?? '-'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close',
-                style: TextStyle(color: OrbitColors.textSecondary)),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _handleLogout();
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: OrbitColors.accentCoral,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                  color: OrbitColors.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                  color: OrbitColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleLogout() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to log out from WorkHub?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ref.read(authProvider.notifier).logout();
-            },
-            child: const Text('Logout',
-                style: TextStyle(color: OrbitColors.accentCoral)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final inboxCount = ref.watch(inboxNotifierProvider).items.length;
@@ -315,11 +146,12 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
         onOpenCheckIn: _showQuickActionSheet,
       ),
       const InboxScreen(),
-      const EmployeeChatScreen(),
+      const InboxScreen(initialSource: 'employee-chat'),
       const ProjectsScreen(),
     ];
 
     return Scaffold(
+      extendBody: true,
       backgroundColor: OrbitColors.scaffoldBackground,
       body: IndexedStack(
         index: _currentIndex,

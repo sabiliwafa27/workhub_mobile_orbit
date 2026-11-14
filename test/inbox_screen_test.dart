@@ -114,6 +114,12 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('Pending item'), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    expect(find.byType(SwitchListTile), findsNothing);
+    expect(find.byKey(const ValueKey('status-pending')), findsOneWidget);
+    expect(find.byKey(const ValueKey('status-complete')), findsOneWidget);
+    expect(find.byKey(const ValueKey('filter-unread')), findsOneWidget);
+    expect(find.byKey(const ValueKey('source-All')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -74,33 +74,36 @@ class _LogisticInOfficerFormState extends ConsumerState<LogisticInOfficerForm> {
       };
 
   Widget choice(String field, String title, List<String> options,
-          {bool withNotes = true}) =>
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        DropdownButtonFormField<String>(
-          key: ValueKey('$field-${values[field]}'),
-          initialValue: values[field],
-          isExpanded: true,
-          decoration: InputDecoration(labelText: title),
-          items: options
-              .map((option) =>
-                  DropdownMenuItem(value: option, child: Text(label(option))))
-              .toList(),
-          validator: (value) => value == null ? 'Select $title.' : null,
-          onChanged: saving || uncertain || submitted
-              ? null
-              : (value) => setState(() {
-                    if (value != null) values[field] = value;
-                  }),
-        ),
-        if (withNotes)
-          TextFormField(
-              controller: controller('${field}_notes'),
-              enabled: !saving && !uncertain && !submitted,
-              maxLength: 2000,
-              maxLines: 2,
-              decoration:
-                  InputDecoration(labelText: '$title notes (optional)')),
-      ]);
+      {bool withNotes = true}) {
+    if (values.containsKey(field) && !options.contains(values[field])) {
+      values.remove(field);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      DropdownButtonFormField<String>(
+        key: ValueKey('$field-${values[field]}'),
+        value: values[field],
+        isExpanded: true,
+        decoration: InputDecoration(labelText: title),
+        items: options
+            .map((option) =>
+                DropdownMenuItem(value: option, child: Text(label(option))))
+            .toList(),
+        validator: (value) => value == null ? 'Select $title.' : null,
+        onChanged: saving || uncertain || submitted
+            ? null
+            : (value) => setState(() {
+                  if (value != null) values[field] = value;
+                }),
+      ),
+      if (withNotes)
+        TextFormField(
+            controller: controller('${field}_notes'),
+            enabled: !saving && !uncertain && !submitted,
+            maxLength: 2000,
+            maxLines: 2,
+            decoration: InputDecoration(labelText: '$title notes (optional)')),
+    ]);
+  }
 
   Future<void> submit() async {
     if (saving || uncertain || submitted) return;

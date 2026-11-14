@@ -535,7 +535,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                           ],
                           DropdownButtonFormField<String>(
                             key: ValueKey('status-$_status'),
-                            initialValue: _status,
+                            value: _status,
                             decoration: const InputDecoration(
                                 labelText: 'Status', isDense: true),
                             items: const [
@@ -566,7 +566,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                           ),
                           DropdownButtonFormField<String>(
                             key: ValueKey('priority-$_priority'),
-                            initialValue: _priority,
+                            value: _priority,
                             decoration: const InputDecoration(
                                 labelText: 'Priority', isDense: true),
                             items: const [

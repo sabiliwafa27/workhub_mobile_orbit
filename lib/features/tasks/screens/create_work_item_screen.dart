@@ -1075,7 +1075,7 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
         ),
         DropdownButtonFormField<String>(
           key: ValueKey('repeat-${repeatFrequency ?? 'none'}'),
-          initialValue: repeatFrequency ?? 'none',
+          value: repeatFrequency ?? 'none',
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Repeat'),
           items: const [
@@ -1120,7 +1120,7 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
           if (repeatFrequency == 'monthly' || repeatFrequency == 'yearly')
             DropdownButtonFormField<int>(
               key: ValueKey('repeatDay-${repeatDay ?? dueDate.day}'),
-              initialValue: repeatDay ?? dueDate.day,
+              value: repeatDay ?? dueDate.day,
               decoration: const InputDecoration(labelText: 'Day of month'),
               items: List.generate(
                   31,
@@ -1132,7 +1132,7 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
           if (repeatFrequency == 'yearly')
             DropdownButtonFormField<int>(
               key: ValueKey('repeatMonth-${repeatMonth ?? dueDate.month}'),
-              initialValue: repeatMonth ?? dueDate.month,
+              value: repeatMonth ?? dueDate.month,
               decoration: const InputDecoration(labelText: 'Month'),
               items: List.generate(
                   12,
@@ -1147,7 +1147,7 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
           if (repeatFrequency == 'monthly_nth_weekday') ...[
             DropdownButtonFormField<int>(
               key: ValueKey('repeatOrdinal-${repeatOrdinal ?? dueDate.day}'),
-              initialValue: repeatOrdinal ??
+              value: repeatOrdinal ??
                   (dueDate.day + 7 >
                           DateTime(dueDate.year, dueDate.month + 1, 0).day
                       ? -1
@@ -1167,7 +1167,7 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
             DropdownButtonFormField<int>(
               key:
                   ValueKey('repeatWeekday-${repeatWeekday ?? dueDate.weekday}'),
-              initialValue: repeatWeekday ?? dueDate.weekday % 7,
+              value: repeatWeekday ?? dueDate.weekday % 7,
               decoration: const InputDecoration(labelText: 'Weekday'),
               items: List.generate(
                   7,
@@ -1466,7 +1466,7 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
                             if (widget.projectId == null)
                               DropdownButtonFormField<int>(
                                 key: ValueKey('project-${projectId ?? 0}'),
-                                initialValue: projectId ?? 0,
+                                value: projectId ?? 0,
                                 isExpanded: true,
                                 decoration:
                                     const InputDecoration(labelText: 'Project'),
@@ -1576,10 +1576,9 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
                             if (canSetPriority)
                               DropdownButtonFormField<String>(
                                 key: ValueKey('priority-$priority'),
-                                initialValue:
-                                    availablePriorities.contains(priority)
-                                        ? priority
-                                        : null,
+                                value: availablePriorities.contains(priority)
+                                    ? priority
+                                    : null,
                                 decoration: const InputDecoration(
                                     labelText: 'Priority'),
                                 hint: const Text('Select priority'),
@@ -1601,7 +1600,7 @@ class _CreateWorkItemScreenState extends ConsumerState<CreateWorkItemScreen> {
                             if (canSetPriority)
                               DropdownButtonFormField<int>(
                                 key: ValueKey('complexity-$complexityId'),
-                                initialValue: complexityId,
+                                value: complexityId,
                                 isExpanded: true,
                                 decoration: const InputDecoration(
                                     labelText: 'Complexity'),
