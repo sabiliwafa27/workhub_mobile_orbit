@@ -14,9 +14,10 @@ void main() {
       ExpandingFabAction(
           label: 'New chat / DM', icon: Icons.chat, onPressed: () {}),
     ]))));
+    final fadeFinder = find.byKey(const ValueKey('expanding-action-fab-fade'));
     expect(
         tester
-            .widget<FadeTransition>(find.byType(FadeTransition))
+            .widget<FadeTransition>(fadeFinder)
             .opacity
             .value,
         0);
@@ -29,7 +30,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
         tester
-            .widget<FadeTransition>(find.byType(FadeTransition))
+            .widget<FadeTransition>(fadeFinder)
             .opacity
             .value,
         0);

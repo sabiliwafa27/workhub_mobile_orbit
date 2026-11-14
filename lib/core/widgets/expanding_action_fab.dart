@@ -224,6 +224,7 @@ class _ExpandingActionFabState extends State<ExpandingActionFab>
             ),
             axisAlignment: 1.0,
             child: FadeTransition(
+              key: const ValueKey('expanding-action-fab-fade'),
               opacity: _controller,
               child: Align(
                 alignment: Alignment.centerRight,
