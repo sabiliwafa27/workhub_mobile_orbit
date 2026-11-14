@@ -10,6 +10,7 @@ import '../../tasks/screens/create_work_item_screen.dart';
 import '../../tasks/screens/task_detail_screen.dart';
 import '../../tasks/providers/task_provider.dart';
 import '../../tasks/providers/ec_progress_provider.dart';
+import '../../home/providers/dashboard_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chat/screens/employee_chat_screen.dart';
 
@@ -63,7 +64,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   String _search = '';
   bool _unreadOnly = false;
   Timer? _searchTimer;
-  Timer? _refreshTimer;
   late final TextEditingController _searchController;
 
   @override
@@ -73,13 +73,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     _view = state.status;
     _search = state.search;
     _searchController = TextEditingController(text: _search);
-    _syncRefreshTimer();
-  }
-
-  @override
-  void didUpdateWidget(covariant InboxScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isActive != widget.isActive) _syncRefreshTimer();
   }
 
   Future<void> _startChat(BuildContext context) async {
@@ -103,22 +96,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       ref.invalidate(ecProgressProvider);
     } else {
       ref.read(taskNotifierProvider.notifier).loadTasks();
-    }
-  }
-
-  void _syncRefreshTimer() {
-    _refreshTimer?.cancel();
-    if (widget.isActive) {
-      _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-        if (mounted) ref.read(inboxNotifierProvider.notifier).loadInbox();
-      });
+      ref.invalidate(dashboardTasksProvider);
+      ref.invalidate(dashboardTaskStatsProvider);
     }
   }
 
   @override
   void dispose() {
     _searchTimer?.cancel();
-    _refreshTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -178,14 +163,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       subtitle: 'Tasks, conversations & approvals',
       floatingActionButton: Padding(
         padding: EdgeInsets.only(
-          bottom: (MediaQuery.paddingOf(context).bottom -
-                  MediaQuery.viewPaddingOf(context).bottom)
-              .clamp(0.0, double.infinity),
+          bottom: 16 +
+              (MediaQuery.paddingOf(context).bottom -
+                      MediaQuery.viewPaddingOf(context).bottom)
+                  .clamp(0.0, double.infinity),
         ),
         child: ExpandingActionFab(actions: [
           ExpandingFabAction(
               label: 'Create task',
-              icon: Icons.add_task,
+              icon: Icons.add_task_rounded,
               onPressed: () => _createWorkItem(context, isEc: false)),
           ExpandingFabAction(
               label: 'Create EC',
@@ -193,7 +179,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               onPressed: () => _createWorkItem(context, isEc: true)),
           ExpandingFabAction(
               label: 'New chat / DM',
-              icon: Icons.chat_bubble_outline,
+              icon: Icons.chat_bubble_outline_rounded,
               onPressed: () => _startChat(context)),
         ]),
       ),
@@ -836,10 +822,38 @@ class InboxItemDetailScreen extends ConsumerWidget {
   const InboxItemDetailScreen({super.key, required this.item});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => OrbitWorkspaceScaffold(
-        subtitle: 'Record details & discussion',
-        appBar: AppBar(title: Text(item.sourceLabel)),
-        body: OrbitDetailList(children: [
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isGuest =
+        item.moduleCode == 'guest-book' || item.subjectType == 'guest';
+    final isTask = (item.subjectType == 'task' ||
+            const ['task', 'workhub', 'task-mine', 'task-assigned']
+                .contains(item.moduleCode)) &&
+        int.tryParse(item.subjectKey ?? '') != null;
+    final isEc = item.moduleCode == 'workhub_ec' &&
+        int.tryParse(item.commentSubjectKey ?? item.subjectKey ?? '') != null;
+    final hasLinkedRecords = item.logisticInDetail != null ||
+        item.logisticOutReference != null ||
+        isEc ||
+        isTask;
+    final canMarkRead = item.isUnread &&
+        (item.readIdentity != null ||
+            item.unreadMentionNotificationIds.isNotEmpty);
+    final hasActions =
+        (item.moduleCode == 'guest-book' && item.subjectKey != null) ||
+            item.logisticOutMentionId != null ||
+            item.logisticInMentionId != null ||
+            canMarkRead;
+    final hasDiscussion = item.commentModule != null &&
+        item.commentModule!.isNotEmpty &&
+        item.commentSubjectKey != null &&
+        item.commentSubjectKey!.isNotEmpty;
+
+    return OrbitWorkspaceScaffold(
+      subtitle: 'Record details & discussion',
+      appBar: AppBar(title: Text(item.sourceLabel)),
+      body: OrbitDetailList(
+        children: [
+          // Header Hero Card
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -848,158 +862,443 @@ class InboxItemDetailScreen extends ConsumerWidget {
               border: Border.all(color: Colors.white),
               boxShadow: const [
                 BoxShadow(
-                    color: Color(0x1606244D),
-                    blurRadius: 16,
-                    offset: Offset(0, 6))
+                  color: Color(0x1606244D),
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                ),
               ],
             ),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const CircleAvatar(
-                    radius: 23,
-                    backgroundColor: OrbitColors.bubbleBlue,
-                    child: Icon(Icons.layers_outlined,
-                        color: OrbitColors.primaryNavy)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Text(item.title,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: OrbitColors.bubbleBlue,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        item.sourceLabel,
                         style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: OrbitColors.textNavy))),
-              ]),
-              const SizedBox(height: 16),
-              if (item.subtitle != null && item.subtitle!.isNotEmpty) ...[
-                Text(item.subtitle!,
-                    style: const TextStyle(
-                        fontSize: 15, color: OrbitColors.textSecondary)),
-                const SizedBox(height: 10),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: OrbitColors.primaryNavy,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: item.status.contains('complete') ||
+                                item.status.contains('approved') ||
+                                item.status == 'done'
+                            ? OrbitColors.kpiGreenBg
+                            : OrbitColors.kpiOrangeBg,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        item.status.replaceAll('_', ' ').toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: item.status.contains('complete') ||
+                                  item.status.contains('approved') ||
+                                  item.status == 'done'
+                              ? const Color(0xFF15803D)
+                              : OrbitColors.brandOrange,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: OrbitColors.bubbleBlue,
+                      child: Icon(
+                        isGuest
+                            ? Icons.badge_outlined
+                            : item.source.contains('logistic')
+                                ? Icons.local_shipping_outlined
+                                : isTask
+                                    ? Icons.task_alt_outlined
+                                    : Icons.layers_outlined,
+                        color: OrbitColors.primaryNavy,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: OrbitColors.textNavy,
+                              height: 1.25,
+                            ),
+                          ),
+                          if (item.subtitle != null &&
+                              item.subtitle!.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              item.subtitle!,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                color: OrbitColors.textSecondary,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (item.createdAt.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Divider(height: 1, color: OrbitColors.cardBorder),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 15,
+                        color: OrbitColors.textMuted,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.createdAt,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: OrbitColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                decoration: BoxDecoration(
-                    color: OrbitColors.kpiGreenBg,
-                    borderRadius: BorderRadius.circular(999)),
-                child: Text(item.status.replaceAll('_', ' '),
-                    style: const TextStyle(color: Color(0xFF15803D))),
+            ),
+          ),
+
+          // Linked Records Card
+          if (hasLinkedRecords) ...[
+            const Divider(height: 24),
+            Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: OrbitColors.bubbleBlue,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.hub_outlined,
+                    size: 17,
+                    color: OrbitColors.primaryNavy,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Linked Records',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: OrbitColors.textNavy,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (item.logisticInDetail case final reference?)
+              _buildLinkedRecordTile(
+                icon: Icons.inventory_2_outlined,
+                title: 'Logistic In details',
+                buttonLabel: 'Open Logistic In details',
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => LogisticInDetailScreen(
+                    line: reference.line,
+                    assignment: reference.assignment,
+                    mention: reference.mention,
+                  ),
+                )),
               ),
-              const SizedBox(height: 10),
-              Row(children: [
-                const Icon(Icons.calendar_today_outlined,
-                    size: 18, color: OrbitColors.primaryNavy),
+            if (item.logisticOutReference case final reference?)
+              _buildLinkedRecordTile(
+                icon: Icons.local_shipping_outlined,
+                title: 'Logistic Out details',
+                buttonLabel: 'Open Logistic Out details',
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => LogisticOutDetailScreen(
+                    stage: reference.stage,
+                    subjectId: reference.id,
+                  ),
+                )),
+              ),
+            if (isEc)
+              _buildLinkedRecordTile(
+                icon: Icons.emoji_events_outlined,
+                title: 'EC contest details',
+                buttonLabel: 'Open EC details',
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => EcInboxDetailScreen(
+                    entryId: item.commentSubjectKey ?? item.subjectKey!,
+                  ),
+                )),
+              ),
+            if (isTask)
+              _buildLinkedRecordTile(
+                icon: Icons.task_alt_outlined,
+                title: 'Task record',
+                buttonLabel: 'Open task',
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) =>
+                      TaskDetailScreen(taskId: int.parse(item.subjectKey!)),
+                )),
+              ),
+          ],
+
+          // Guest / Record details Card
+          if (item.details.isNotEmpty) ...[
+            const Divider(height: 24),
+            Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: OrbitColors.bubbleBlue,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.badge_outlined,
+                    size: 17,
+                    color: OrbitColors.primaryNavy,
+                  ),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
-                    child: Text(item.createdAt,
-                        style:
-                            const TextStyle(color: OrbitColors.textSecondary))),
-              ]),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          if (item.logisticInDetail case final reference?)
-            TextButton.icon(
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Open Logistic In details'),
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => LogisticInDetailScreen(
-                        line: reference.line,
-                        assignment: reference.assignment,
-                        mention: reference.mention,
-                      ))),
+                  child: Text(
+                    'Guest information',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: OrbitColors.textNavy,
+                        ),
+                  ),
+                ),
+              ],
             ),
-          if (item.logisticOutReference case final reference?)
-            TextButton.icon(
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Open Logistic Out details'),
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => LogisticOutDetailScreen(
-                      stage: reference.stage, subjectId: reference.id))),
-            ),
-          if (item.details.isNotEmpty) ...[
-            const Divider(height: 32),
-            Text('Guest information',
-                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
             for (final field in item.details.entries)
               ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(field.key),
-                  subtitle: Text(field.value)),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                title: Text(
+                  field.key,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: OrbitColors.textSecondary,
+                  ),
+                ),
+                subtitle: Text(
+                  field.value,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: OrbitColors.textNavy,
+                  ),
+                ),
+              ),
           ],
-          if (item.moduleCode == 'guest-book' && item.subjectKey != null)
-            _GuestCompletionAction(item: item),
-          if (item.logisticOutMentionId != null)
-            _LogisticOutMentionAction(item: item),
-          if (item.logisticInMentionId != null)
-            _LogisticInMentionAction(item: item),
-          if (item.moduleCode == 'workhub_ec' &&
-              int.tryParse(item.commentSubjectKey ?? item.subjectKey ?? '') !=
-                  null)
-            TextButton.icon(
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Open EC details'),
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => EcInboxDetailScreen(
-                      entryId: item.commentSubjectKey ?? item.subjectKey!))),
+
+          // Actions Card
+          if (hasActions) ...[
+            const Divider(height: 24),
+            Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: OrbitColors.bubbleBlue,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.touch_app_outlined,
+                    size: 17,
+                    color: OrbitColors.primaryNavy,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Actions',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: OrbitColors.textNavy,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          if ((item.subjectType == 'task' ||
-                  const ['task', 'workhub', 'task-mine', 'task-assigned']
-                      .contains(item.moduleCode)) &&
-              int.tryParse(item.subjectKey ?? '') != null)
-            TextButton.icon(
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Open task'),
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) =>
-                      TaskDetailScreen(taskId: int.parse(item.subjectKey!)))),
+            const SizedBox(height: 10),
+            if (item.moduleCode == 'guest-book' && item.subjectKey != null)
+              _GuestCompletionAction(item: item),
+            if (item.logisticOutMentionId != null)
+              _LogisticOutMentionAction(item: item),
+            if (item.logisticInMentionId != null)
+              _LogisticInMentionAction(item: item),
+            if (canMarkRead) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  icon: const Icon(Icons.mark_email_read_outlined, size: 18),
+                  label: const Text('Mark as read'),
+                  onPressed: () async {
+                    final identity = item.readIdentity;
+                    var success = true;
+                    if (identity != null) {
+                      success = await ref.read(inboxRepositoryProvider).markRead(
+                            identity.module,
+                            identity.routeKey,
+                            readSubjectType: identity.type,
+                            readSubjectKey: identity.key,
+                          );
+                    }
+                    try {
+                      await ref
+                          .read(inboxRepositoryProvider)
+                          .markMentionNotificationsRead(
+                              item.unreadMentionNotificationIds);
+                    } catch (_) {
+                      success = false;
+                    }
+                    if (!context.mounted) return;
+                    if (success) {
+                      await ref
+                          .read(inboxNotifierProvider.notifier)
+                          .loadInbox();
+                      if (context.mounted) Navigator.pop(context);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content:
+                              Text('Unable to mark this item as read.'),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+          ],
+
+          // Discussion Card
+          if (hasDiscussion) ...[
+            const Divider(height: 24),
+            Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: OrbitColors.bubbleBlue,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 17,
+                    color: OrbitColors.primaryNavy,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Discussion',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: OrbitColors.textNavy,
+                        ),
+                  ),
+                ),
+              ],
             ),
-          if (item.isUnread &&
-              (item.readIdentity != null ||
-                  item.unreadMentionNotificationIds.isNotEmpty))
-            TextButton.icon(
-              icon: const Icon(Icons.mark_email_read_outlined),
-              label: const Text('Mark as read'),
-              onPressed: () async {
-                final identity = item.readIdentity;
-                var success = true;
-                if (identity != null) {
-                  success = await ref.read(inboxRepositoryProvider).markRead(
-                      identity.module, identity.routeKey,
-                      readSubjectType: identity.type,
-                      readSubjectKey: identity.key);
-                }
-                try {
-                  await ref
-                      .read(inboxRepositoryProvider)
-                      .markMentionNotificationsRead(
-                          item.unreadMentionNotificationIds);
-                } catch (_) {
-                  success = false;
-                }
-                if (!context.mounted) return;
-                if (success) {
-                  await ref.read(inboxNotifierProvider.notifier).loadInbox();
-                  if (context.mounted) Navigator.pop(context);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Unable to mark this item as read.')));
-                }
-              },
-            ),
-          if (item.commentModule != null &&
-              item.commentModule!.isNotEmpty &&
-              item.commentSubjectKey != null &&
-              item.commentSubjectKey!.isNotEmpty) ...[
-            const Divider(height: 32),
-            Text('Discussion', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             InboxDiscussion(
-                module: item.commentModule!,
-                subjectKey: item.commentSubjectKey!),
+              module: item.commentModule!,
+              subjectKey: item.commentSubjectKey!,
+            ),
           ],
-        ]),
-      );
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinkedRecordTile({
+    required IconData icon,
+    required String title,
+    required String buttonLabel,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: OrbitColors.scaffoldBackground.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: OrbitColors.cardBorder),
+        ),
+        child: ListTile(
+          dense: true,
+          leading: Icon(icon, color: OrbitColors.primaryNavy, size: 20),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: OrbitColors.textNavy,
+            ),
+          ),
+          trailing: TextButton.icon(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.open_in_new, size: 15),
+            label: Text(
+              buttonLabel,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+            onPressed: onTap,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _GuestCompletionAction extends ConsumerStatefulWidget {

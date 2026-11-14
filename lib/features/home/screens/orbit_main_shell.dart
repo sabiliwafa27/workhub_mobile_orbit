@@ -8,6 +8,7 @@ import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
 import '../../projects/screens/projects_screen.dart';
 import '../../tasks/screens/task_screen.dart';
+import '../../erpa/screens/erpa_screen.dart';
 import 'orbit_dashboard_view.dart';
 
 class OrbitMainShell extends ConsumerStatefulWidget {
@@ -143,11 +144,15 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
       OrbitDashboardView(
         onOpenSearch: () => setState(() => _currentIndex = 2),
         onOpenNotifications: () => setState(() => _currentIndex = 1),
+        onOpenTasks: () => setState(() => _currentIndex = 2),
+        onOpenProjects: () => setState(() => _currentIndex = 3),
+        onOpenErp: () => setState(() => _currentIndex = 4),
         onOpenCheckIn: _showQuickActionSheet,
       ),
       const InboxScreen(),
-      const InboxScreen(initialSource: 'employee-chat'),
+      const TaskScreen(),
       const ProjectsScreen(),
+      const ErpaScreen(),
     ];
 
     return Scaffold(

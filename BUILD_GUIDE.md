@@ -47,6 +47,6 @@ The **Check for App Updates** menu now checks Shorebird first. If Shorebird is u
 1. Install Shorebird CLI, sign in to the Shorebird account that will own this app, and run `shorebird init` in the project. Add the generated app ID and a Shorebird API token to GitHub repository secrets as `SHOREBIRD_APP_ID` and `SHOREBIRD_TOKEN`.
 2. Push to `main`, or run **Build Android APK** manually with `operation: release`. This creates a Shorebird release and publishes its ARM64 APK.
 3. Install that Shorebird-built APK once. APKs previously built with plain `flutter build` do not contain the Shorebird runtime and cannot receive patches.
-4. For later Dart or Flutter UI changes, run **Build Android APK** with `operation: patch` and the target release version (for example `1.0.0+42`). The patch downloads when the user taps **Check for App Updates** and takes effect after the app is fully closed and reopened.
+4. For later Dart or Flutter UI changes, run **Build Android APK** with `operation: patch` and the target release version (for example `1.0.42+42`). The patch downloads when the user taps **Check for App Updates** and takes effect after the app is fully closed and reopened.
 
 Native Android or iOS code, plugin platform code, assets, permissions, or a Flutter engine change still requires a new full Shorebird release and APK installation.

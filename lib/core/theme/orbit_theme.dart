@@ -77,7 +77,8 @@ class OrbitTheme {
       }),
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
-      fontFamily: 'Roboto',
+      fontFamily: 'Google Sans',
+      fontFamilyFallback: const ['Google Sans Text', 'Roboto', 'sans-serif'],
       visualDensity: VisualDensity.standard,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,

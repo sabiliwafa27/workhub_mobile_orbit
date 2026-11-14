@@ -50,6 +50,7 @@ class OrbitWorkspaceScaffold extends StatelessWidget {
   final AppBar? appBar;
   final String subtitle;
   final Widget? body, floatingActionButton;
+  final FloatingActionButtonLocation? floatingActionButtonLocation;
   final Color? backgroundColor;
   final IconData? headerIcon;
   final Color? floatingActionButtonColor;
@@ -59,6 +60,7 @@ class OrbitWorkspaceScaffold extends StatelessWidget {
       this.subtitle = '',
       this.body,
       this.floatingActionButton,
+      this.floatingActionButtonLocation,
       this.backgroundColor,
       this.headerIcon,
       this.floatingActionButtonColor});
@@ -72,7 +74,7 @@ class OrbitWorkspaceScaffold extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-                fontFamily: 'Roboto',
+                fontFamily: 'Google Sans',
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white))
@@ -186,7 +188,7 @@ class OrbitWorkspaceScaffold extends StatelessWidget {
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                      fontFamily: 'Roboto',
+                                      fontFamily: 'Google Sans',
                                       fontSize: 11,
                                       fontWeight: FontWeight.w400,
                                       height: 1.2,
@@ -197,6 +199,7 @@ class OrbitWorkspaceScaffold extends StatelessWidget {
                       bottom: bar.bottom,
                     ),
               floatingActionButton: floatingActionButton,
+              floatingActionButtonLocation: floatingActionButtonLocation,
               body: body == null ? null : OrbitEntrance(child: body!),
             )),
       ]),

@@ -70,89 +70,392 @@ class LogisticOutDetailScreen extends ConsumerWidget {
                       ? const SizedBox.shrink()
                       : ListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text(label),
-                          subtitle: Text(value.toString()));
-              return OrbitDetailList(children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: OrbitColors.cardSurface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: OrbitColors.cardBorder),
+                          visualDensity: VisualDensity.compact,
+                          title: Text(
+                            label,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: OrbitColors.textSecondary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            value.toString(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: OrbitColors.textNavy,
+                            ),
+                          ),
+                        );
+
+              final statusStr = (_at(header, ['status_name']) ??
+                      _at(trip, ['status_name']) ??
+                      '')
+                  .toString();
+              final poRef = _at(header, ['display_reference'])?.toString();
+              final hasTransport = _at(header,
+                          ['central_approval', 'shipping_method_name']) !=
+                      null ||
+                  _at(trip, ['transport_method']) != null ||
+                  _at(header,
+                          ['requested_vehicle_type', 'vehicle_type_code']) !=
+                      null ||
+                  _at(trip, ['planned_vehicle_type', 'code']) != null ||
+                  _at(transport, ['internal', 'license_plate']) != null ||
+                  _at(transport, ['expedition', 'license_plate']) != null ||
+                  _at(transport, ['internal', 'driver_full_name']) != null ||
+                  _at(transport, ['expedition', 'driver_full_name']) != null ||
+                  _at(transport, ['internal', 'helper_full_name']) != null ||
+                  _at(transport, ['internal', 'seal_number']) != null ||
+                  _at(transport, ['expedition', 'seal_number']) != null;
+
+              return OrbitDetailList(
+                children: [
+                  // Hero Header Card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: OrbitColors.cardSurface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x1606244D),
+                          blurRadius: 16,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: OrbitColors.bubbleBlue,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Text(
+                                'LOGISTIC OUT',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: OrbitColors.primaryNavy,
+                                ),
+                              ),
+                            ),
+                            if (statusStr.isNotEmpty) ...[
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: statusStr.contains('complete') ||
+                                          statusStr.contains('delivered') ||
+                                          statusStr.contains('loaded')
+                                      ? OrbitColors.kpiGreenBg
+                                      : OrbitColors.kpiOrangeBg,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  statusStr.replaceAll('_', ' ').toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: statusStr.contains('complete') ||
+                                            statusStr.contains('delivered') ||
+                                            statusStr.contains('loaded')
+                                        ? const Color(0xFF15803D)
+                                        : OrbitColors.brandOrange,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const CircleAvatar(
+                              radius: 22,
+                              backgroundColor: OrbitColors.bubbleBlue,
+                              child: Icon(
+                                Icons.local_shipping_outlined,
+                                color: OrbitColors.primaryNavy,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Logistic Out Overview',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: OrbitColors.textNavy,
+                                      height: 1.25,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (poRef != null && poRef.isNotEmpty) ...[
+                          const SizedBox(height: 14),
+                          const Divider(
+                              height: 1, color: OrbitColors.cardBorder),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.tag_rounded,
+                                size: 15,
+                                color: OrbitColors.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'PO Ref: $poRef',
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: OrbitColors.primaryNavy,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  child: Row(children: [
-                    const CircleAvatar(
-                        radius: 26,
-                        backgroundColor: OrbitColors.bubbleBlue,
-                        child: Icon(Icons.local_shipping_outlined,
-                            color: OrbitColors.primaryNavy)),
-                    const SizedBox(width: 14),
-                    Expanded(
-                        child: Text('Logistic Out Overview',
+
+                  // Order & Route Card
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: OrbitColors.bubbleBlue,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.receipt_long_outlined,
+                          size: 17,
+                          color: OrbitColors.primaryNavy,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Order & Route',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: OrbitColors.textNavy,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  field(
+                      'Status',
+                      _at(header, ['status_name']) ??
+                          _at(trip, ['status_name'])),
+                  field('Purchase order', _at(header, ['display_reference'])),
+                  field('Requester', _at(header, ['requester', 'branch_name'])),
+                  field('Supplier', _at(header, ['supplier', 'branch_name'])),
+                  field('Request date', _at(header, ['request_date'])),
+                  field('Loading date', _at(header, ['loading_date'])),
+
+                  // Transport & Vehicle Card
+                  if (hasTransport) ...[
+                    const Divider(height: 24),
+                    Row(
+                      children: [
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: OrbitColors.bubbleBlue,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.local_shipping_outlined,
+                            size: 17,
+                            color: OrbitColors.primaryNavy,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Transport & Vehicle',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: OrbitColors.textNavy,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    field(
+                        'Shipping method',
+                        _at(header, [
+                              'central_approval',
+                              'shipping_method_name'
+                            ]) ??
+                            _at(trip, ['transport_method'])),
+                    field(
+                        'Vehicle type',
+                        _at(header, [
+                              'requested_vehicle_type',
+                              'vehicle_type_code'
+                            ]) ??
+                            _at(trip, ['planned_vehicle_type', 'code'])),
+                    field(
+                        'License plate',
+                        _at(transport, ['internal', 'license_plate']) ??
+                            _at(transport, ['expedition', 'license_plate'])),
+                    field(
+                        'Driver',
+                        _at(transport, ['internal', 'driver_full_name']) ??
+                            _at(transport, ['expedition', 'driver_full_name'])),
+                    field('Helper',
+                        _at(transport, ['internal', 'helper_full_name'])),
+                    field(
+                        'Seal number',
+                        _at(transport, ['internal', 'seal_number']) ??
+                            _at(transport, ['expedition', 'seal_number'])),
+                  ],
+
+                  // Member Purchase Orders Card
+                  if (members.isNotEmpty) ...[
+                    const Divider(height: 24),
+                    Row(
+                      children: [
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: OrbitColors.bubbleBlue,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.folder_shared_outlined,
+                            size: 17,
+                            color: OrbitColors.primaryNavy,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Purchase orders',
                             style: Theme.of(context)
                                 .textTheme
-                                .titleLarge
+                                .titleMedium
                                 ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: OrbitColors.textNavy))),
-                  ]),
-                ),
-                const SizedBox(height: 12),
-                field('Status',
-                    _at(header, ['status_name']) ?? _at(trip, ['status_name'])),
-                field('Purchase order', _at(header, ['display_reference'])),
-                field('Requester', _at(header, ['requester', 'branch_name'])),
-                field('Supplier', _at(header, ['supplier', 'branch_name'])),
-                field('Request date', _at(header, ['request_date'])),
-                field('Loading date', _at(header, ['loading_date'])),
-                field(
-                    'Shipping method',
-                    _at(header, ['central_approval', 'shipping_method_name']) ??
-                        _at(trip, ['transport_method'])),
-                field(
-                    'Vehicle type',
-                    _at(header,
-                            ['requested_vehicle_type', 'vehicle_type_code']) ??
-                        _at(trip, ['planned_vehicle_type', 'code'])),
-                field(
-                    'License plate',
-                    _at(transport, ['internal', 'license_plate']) ??
-                        _at(transport, ['expedition', 'license_plate'])),
-                field(
-                    'Driver',
-                    _at(transport, ['internal', 'driver_full_name']) ??
-                        _at(transport, ['expedition', 'driver_full_name'])),
-                field(
-                    'Helper', _at(transport, ['internal', 'helper_full_name'])),
-                field(
-                    'Seal number',
-                    _at(transport, ['internal', 'seal_number']) ??
-                        _at(transport, ['expedition', 'seal_number'])),
-                if (members.isNotEmpty) ...[
-                  const Divider(),
-                  Text('Purchase orders',
-                      style: Theme.of(context).textTheme.titleMedium),
-                  for (final member in members.whereType<Map>())
-                    field(
+                                  fontWeight: FontWeight.w700,
+                                  color: OrbitColors.textNavy,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    for (final member in members.whereType<Map>())
+                      field(
                         'Purchase order',
                         member['display_reference'] ??
-                            member['logistic_out_id']),
-                ],
-                if (items.isNotEmpty) ...[
-                  const Divider(),
-                  Text('Items', style: Theme.of(context).textTheme.titleMedium),
-                  for (final item in items.whereType<Map>())
-                    ListTile(
+                            member['logistic_out_id'],
+                      ),
+                  ],
+
+                  // Items Card
+                  if (items.isNotEmpty) ...[
+                    const Divider(height: 24),
+                    Row(
+                      children: [
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: OrbitColors.bubbleBlue,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 17,
+                            color: OrbitColors.primaryNavy,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Items',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: OrbitColors.textNavy,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    for (final item in items.whereType<Map>())
+                      ListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: Text((item['item_name'] ??
-                                item['product_name'] ??
-                                item['name'] ??
-                                'Item')
-                            .toString()),
-                        subtitle: Text((item['quantity'] ?? item['qty'] ?? '')
-                            .toString())),
+                        visualDensity: VisualDensity.compact,
+                        leading: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: OrbitColors.bubbleBlue,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.inventory_2_outlined,
+                            color: OrbitColors.primaryNavy,
+                            size: 18,
+                          ),
+                        ),
+                        title: Text(
+                          (item['item_name'] ??
+                                  item['product_name'] ??
+                                  item['name'] ??
+                                  'Item')
+                              .toString(),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: OrbitColors.textNavy,
+                          ),
+                        ),
+                        subtitle: Text(
+                          (item['quantity'] ?? item['qty'] ?? '').toString(),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: OrbitColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                  ],
                 ],
-              ]);
+              );
             },
           ),
     );

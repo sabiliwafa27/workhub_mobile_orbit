@@ -20,7 +20,8 @@ class _Repository extends TaskRepository {
   final older = Completer<TaskPage>();
   @override
   Future<TaskPage> fetchTasks(
-      {String status = 'all',
+      {TaskScope scope = TaskScope.assignedToMe,
+      String status = 'all',
       String search = '',
       String priority = '',
       String? from,
@@ -41,7 +42,8 @@ class _RetryRepository extends TaskRepository {
   int pageTwoCalls = 0;
   @override
   Future<TaskPage> fetchTasks(
-      {String status = 'all',
+      {TaskScope scope = TaskScope.assignedToMe,
+      String status = 'all',
       String search = '',
       String priority = '',
       String? from,
@@ -56,7 +58,8 @@ class _OverlapRepository extends TaskRepository {
   _OverlapRepository(ApiClient client) : super(client);
   @override
   Future<TaskPage> fetchTasks(
-          {String status = 'all',
+          {TaskScope scope = TaskScope.assignedToMe,
+          String status = 'all',
           String search = '',
           String priority = '',
           String? from,

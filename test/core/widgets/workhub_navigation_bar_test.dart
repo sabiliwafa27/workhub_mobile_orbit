@@ -25,8 +25,9 @@ void main() {
     expect(find.byType(Scaffold).first, findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Inbox'), findsOneWidget);
-    expect(find.text('DM'), findsOneWidget);
+    expect(find.text('Tasks'), findsOneWidget);
     expect(find.text('Projects'), findsOneWidget);
+    expect(find.text('ERPa'), findsOneWidget);
     expect(find.text('4'), findsOneWidget);
 
     final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
@@ -60,7 +61,7 @@ void main() {
     expect(pillDecoration.boxShadow, isNotNull);
     expect(pillDecoration.boxShadow, isNotEmpty);
 
-    await tester.tap(find.text('DM'));
+    await tester.tap(find.text('Tasks'));
     expect(selected, 2);
   });
 }

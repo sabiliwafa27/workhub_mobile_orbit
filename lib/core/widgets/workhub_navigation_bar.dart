@@ -37,6 +37,7 @@ class WorkHubNavigationBar extends StatelessWidget {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                 child: NavigationBar(
+                  key: const ValueKey('orbit-bottom-navigation'),
                   height: 68,
                   selectedIndex: selectedIndex,
                   onDestinationSelected: onSelected,
@@ -62,13 +63,17 @@ class WorkHubNavigationBar extends StatelessWidget {
                       label: 'Inbox',
                     ),
                     const NavigationDestination(
-                        icon: Icon(Icons.chat_bubble_outline),
-                        selectedIcon: Icon(Icons.chat_bubble),
-                        label: 'DM'),
+                        icon: Icon(Icons.task_alt_outlined),
+                        selectedIcon: Icon(Icons.task_alt),
+                        label: 'Tasks'),
                     const NavigationDestination(
                         icon: Icon(Icons.folder_outlined),
                         selectedIcon: Icon(Icons.folder),
                         label: 'Projects'),
+                    const NavigationDestination(
+                        icon: Icon(Icons.grid_view_outlined),
+                        selectedIcon: Icon(Icons.grid_view_rounded),
+                        label: 'ERPa'),
                   ],
                 ),
               ),

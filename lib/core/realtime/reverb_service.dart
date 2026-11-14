@@ -41,18 +41,42 @@ class ReverbRealtimeService {
       final data = root is Map && root['data'] is Map
           ? Map<String, dynamic>.from(root['data'] as Map)
           : <String, dynamic>{};
-      final host = data['host'] as String? ?? 'orbit.kecapsawi.net';
-      final port = (data['port'] as num?)?.toInt() ??
-          ((data['scheme'] ?? 'https') == 'https' ? 443 : 8080);
-      final scheme = data['scheme'] as String? ?? 'https';
+      var host = data['host'] as String? ?? 'orbit.kecapsawi.net';
+      var scheme = data['scheme'] as String? ?? 'https';
+      var port = (data['port'] as num?)?.toInt();
+
+      final baseUrlStr = await _apiClient.storage.getBaseUrl();
+      final baseUri = Uri.tryParse(baseUrlStr);
+
+      if ((host == '127.0.0.1' || host == 'localhost') &&
+          baseUri != null &&
+          baseUri.host.isNotEmpty) {
+        if (baseUri.host != '127.0.0.1' && baseUri.host != 'localhost') {
+          host = baseUri.host;
+          if (baseUri.scheme == 'https') {
+            scheme = 'https';
+            port = 443;
+          }
+        }
+      }
+
+      port ??= ((scheme == 'https') ? 443 : 8080);
       final appKey = data['app_key'] as String? ?? 'erplab_reverb_key';
       _authEndpoint =
-          data['auth_endpoint'] as String? ?? '/api/broadcasting/auth';
+          data['auth_endpoint'] as String? ?? '/broadcasting/auth';
+      if (_authEndpoint == '/api/broadcasting/auth') {
+        _authEndpoint = '/broadcasting/auth';
+      }
 
       final wsScheme = scheme == 'https' ? 'wss' : 'ws';
+      final portSuffix = (scheme == 'https' && port == 443) ||
+              (scheme == 'http' && port == 80)
+          ? ''
+          : ':$port';
       final uri = Uri.parse(
-        '$wsScheme://$host:$port/app/$appKey?protocol=7&client=js&version=8.4.0-reverb&flash=false',
+        '$wsScheme://$host$portSuffix/app/$appKey?protocol=7&client=js&version=8.4.0-reverb&flash=false',
       );
+      debugPrint('Reverb connecting to uri: $uri (data: $data, baseUrl: $baseUrlStr)');
 
       final channel = WebSocketChannel.connect(uri);
       _channel = channel;
@@ -167,11 +191,26 @@ class ReverbRealtimeService {
     try {
       final payload = <String, dynamic>{'channel': channelName};
       if (channelName.startsWith('private-')) {
-        final response = await _apiClient.dio.post(
-          _authEndpoint ?? '/api/broadcasting/auth',
-          data: {'socket_id': socketId, 'channel_name': channelName},
-        );
-        final result = response.data;
+        late final dynamic responseData;
+        try {
+          final response = await _apiClient.dio.post(
+            _authEndpoint ?? '/broadcasting/auth',
+            data: {'socket_id': socketId, 'channel_name': channelName},
+          );
+          responseData = response.data;
+        } on Exception {
+          if (_authEndpoint != '/broadcasting/auth') {
+            _authEndpoint = '/broadcasting/auth';
+            final fallbackResponse = await _apiClient.dio.post(
+              '/broadcasting/auth',
+              data: {'socket_id': socketId, 'channel_name': channelName},
+            );
+            responseData = fallbackResponse.data;
+          } else {
+            rethrow;
+          }
+        }
+        final result = responseData;
         if (result is! Map || result['auth'] is! String) {
           throw const FormatException(
               'Unexpected private channel auth response');

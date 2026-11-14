@@ -176,8 +176,8 @@ void main() {
     expect(find.text('42'), findsOneWidget);
     expect(find.text('Task Progress'), findsOneWidget);
     expect(find.text('19%'), findsOneWidget);
-    expect(find.text('Chat'), findsOneWidget);
-    expect(find.text('ERP'), findsWidgets);
+    expect(find.text('Tasks'), findsWidgets);
+    expect(find.text('ERPa'), findsWidgets);
     expect(OrbitColors.primaryNavy, const Color(0xFF06244D));
     expect(OrbitColors.brandOrange, const Color(0xFFD97706));
     expect(tester.takeException(), isNull);

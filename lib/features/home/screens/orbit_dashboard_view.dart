@@ -8,7 +8,6 @@ import '../../../core/theme/orbit_theme.dart';
 import '../../../core/theme/orbit_motion.dart';
 import '../providers/dashboard_provider.dart';
 import 'orbit_dashboard_components.dart';
-import '../../projects/screens/projects_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
@@ -177,17 +176,9 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   int _ecPage = 1;
   bool _showEc = false;
   int _selectedVisitFilter = 0; // 0: All, 1: Open, 2: Check in, 3: Closed
-  DashboardPeriod _period = DashboardPeriod.today;
+  DashboardPeriod _period = DashboardPeriod.month;
 
   void _openTasks() => (widget.onOpenTasks ?? widget.onOpenSearch)();
-  void _openProjects() {
-    if (widget.onOpenProjects != null) {
-      widget.onOpenProjects!();
-      return;
-    }
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const ProjectsScreen()));
-  }
 
   final Set<int> _pendingTaskActions = {};
   final Set<int> _uncertainTaskActions = {};
@@ -196,6 +187,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     final period = _period;
     final notifier = ref.read(dashboardTasksProvider(period).notifier);
     await notifier.loadTasks();
+    ref.invalidate(dashboardTaskStatsProvider(period));
     if (mounted &&
         _period == period &&
         identical(
@@ -331,15 +323,6 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                             .isLoading,
                         onViewAll: _openTasks,
                       )),
-                  const SizedBox(height: 12),
-                  OrbitEntrance(
-                      delay: const Duration(milliseconds: 210),
-                      child: DashboardShortcuts(
-                          onTasks: () => setState(() => _showEc = false),
-                          onInbox: widget.onOpenNotifications,
-                          onProjects: _openProjects,
-                          onErp: widget.onOpenErp ?? widget.onOpenNotifications,
-                          unread: inbox?.incompleteUnreadCount)),
                   const SizedBox(height: 12),
                   if (!_showEc)
                     OrbitEntrance(

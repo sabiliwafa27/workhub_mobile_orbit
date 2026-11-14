@@ -13,7 +13,7 @@ on:
         options: [ release, patch ]
         default: release
       release_version:
-        description: Existing Shorebird release version for a patch (for example 1.0.0+42, or latest)
+        description: Existing Shorebird release version for a patch (for example 1.0.42+42, or latest)
         required: false
         default: latest
 
@@ -109,7 +109,7 @@ jobs:
 
       - name: Build verification APK for pull requests
         if: github.event_name == 'pull_request'
-        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
+        run: flutter build apk --release --target-platform android-arm64 --split-per-abi --build-name "1.0.$GITHUB_RUN_NUMBER" --build-number "$GITHUB_RUN_NUMBER"
 
       - name: Set up Shorebird
         if: github.event_name != 'pull_request'
@@ -149,7 +149,7 @@ jobs:
             echo 'Configure the SHOREBIRD_TOKEN repository secret before releasing.' >&2
             exit 1
           fi
-          shorebird release android --artifact apk --target-platform android-arm64 --build-number "$GITHUB_RUN_NUMBER"
+          shorebird release android --artifact apk --target-platform android-arm64 --build-name "1.0.$GITHUB_RUN_NUMBER" --build-number "$GITHUB_RUN_NUMBER"
 
       - name: Publish Shorebird APK release
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.shorebird-config.outputs.enabled == 'true') || (github.event_name == 'workflow_dispatch' && inputs.operation == 'release')
@@ -166,7 +166,7 @@ jobs:
 
       - name: Build standard APK without Shorebird
         if: github.event_name == 'push' && steps.shorebird-config.outputs.enabled != 'true'
-        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
+        run: flutter build apk --release --target-platform android-arm64 --split-per-abi --build-name "1.0.$GITHUB_RUN_NUMBER" --build-number "$GITHUB_RUN_NUMBER"
 
       - name: Publish standard APK release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.shorebird-config.outputs.enabled != 'true'

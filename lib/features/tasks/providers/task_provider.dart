@@ -3,6 +3,11 @@ import '../../../core/network/api_client.dart';
 import '../../../core/realtime/reverb_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
+enum TaskScope {
+  assignedToMe,
+  delegatedByMe,
+}
+
 class TaskItemModel {
   final int id;
   final String title;
@@ -61,6 +66,32 @@ class TaskItemModel {
               .toList(),
     );
   }
+
+  factory TaskItemModel.fromInboxJson(Map<String, dynamic> json) {
+    final status = json['status'] as String? ?? 'open';
+    final isComplete = json['is_complete'] == true || status == 'completed';
+    final title = (json['item_name'] as String?)?.isNotEmpty == true
+        ? json['item_name'] as String
+        : (json['title'] as String? ?? 'Task')
+            .replaceFirst(RegExp(r'^WorkHub:\s*'), '');
+    return TaskItemModel(
+      id: (json['subject_id'] as num?)?.toInt() ?? 0,
+      title: title,
+      description: json['description'] as String? ?? '',
+      status: status,
+      progressPercent:
+          isComplete ? 100 : ((json['progress_percent'] as num?)?.toInt() ?? 0),
+      dueDate: (json['due_date'] as String? ?? '').split('T').first,
+      priority: json['priority'] as String? ?? 'normal',
+      projectName: json['project_name'] as String?,
+      hasPendingReview: json['pending_review'] == true,
+      assignees: json['assignee_name'] != null
+          ? [json['assignee_name'].toString()]
+          : (json['assigner_name'] != null
+              ? [json['assigner_name'].toString()]
+              : const []),
+    );
+  }
 }
 
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
@@ -74,12 +105,23 @@ class TaskRepository {
   TaskRepository(this._apiClient);
 
   Future<TaskPage> fetchTasks(
-      {String status = 'all',
+      {TaskScope scope = TaskScope.assignedToMe,
+      String status = 'all',
       String search = '',
       String priority = '',
       String? from,
       String? to,
       int page = 1}) async {
+    if (scope == TaskScope.delegatedByMe) {
+      return _fetchDelegatedTasks(
+        status: status,
+        search: search,
+        priority: priority,
+        from: from,
+        to: to,
+        page: page,
+      );
+    }
     try {
       final response = await _apiClient.dio.get('/tasks', queryParameters: {
         'status': status,
@@ -114,6 +156,88 @@ class TaskRepository {
         }
       }
       throw const FormatException('Unexpected task list response');
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  Future<TaskPage> _fetchDelegatedTasks({
+    String status = 'all',
+    String search = '',
+    String priority = '',
+    String? from,
+    String? to,
+    int page = 1,
+  }) async {
+    try {
+      final view = status == 'completed'
+          ? 'complete'
+          : (status == 'open' || status == 'in_progress' || status == 'overdue')
+              ? 'incomplete'
+              : 'all';
+      final response = await _apiClient.dio.get(
+        '/api/v1/inbox/todos',
+        queryParameters: {
+          'view': view,
+          if (search.isNotEmpty) 'search': search,
+        },
+      );
+      if (response.data is Map) {
+        final data = response.data as Map;
+        final raw =
+            data['tasks'] ?? data[view] ?? data['incomplete'] ?? data['data'];
+        if (raw is List) {
+          final now = DateTime.now();
+          final todayStr =
+              '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+          var items = raw
+              .whereType<Map>()
+              .where(
+                  (item) => item['id'].toString().startsWith('task-assigned-'))
+              .map((json) =>
+                  TaskItemModel.fromInboxJson(Map<String, dynamic>.from(json)))
+              .toList();
+
+          if (status == 'overdue') {
+            items = items.where((t) {
+              final isComplete = t.status == 'completed';
+              return !isComplete &&
+                  (t.status == 'overdue' ||
+                      (t.dueDate.isNotEmpty &&
+                          t.dueDate.compareTo(todayStr) < 0));
+            }).toList();
+          } else if (from != null && to != null) {
+            items = items.where((t) {
+              if (t.dueDate.isEmpty) return true;
+              return t.dueDate.compareTo(from) >= 0 &&
+                  t.dueDate.compareTo(to) <= 0;
+            }).toList();
+          }
+
+          if (priority.isNotEmpty) {
+            items = items
+                .where(
+                    (t) => t.priority.toLowerCase() == priority.toLowerCase())
+                .toList();
+          }
+
+          const perPage = 25;
+          final total = items.length;
+          final lastPage = (total / perPage).ceil().clamp(1, 999);
+          final startIndex = ((page - 1) * perPage).clamp(0, total);
+          final endIndex = (startIndex + perPage).clamp(0, total);
+          final paginated = items.sublist(startIndex, endIndex);
+
+          return TaskPage(
+            tasks: paginated,
+            page: page,
+            lastPage: lastPage,
+            total: total,
+          );
+        }
+      }
+      return TaskPage(tasks: [], page: 1, lastPage: 1, total: 0);
     } catch (_) {
       rethrow;
     }
@@ -186,6 +310,7 @@ class TaskListState {
   final bool isLoadingMore;
   final String? loadMoreError;
   final int total;
+  final TaskScope scope;
 
   TaskListState({
     this.tasks = const [],
@@ -196,6 +321,7 @@ class TaskListState {
     this.isLoadingMore = false,
     this.loadMoreError,
     this.total = 0,
+    this.scope = TaskScope.assignedToMe,
   });
 
   TaskListState copyWith({
@@ -207,6 +333,7 @@ class TaskListState {
     bool? isLoadingMore,
     String? loadMoreError,
     int? total,
+    TaskScope? scope,
   }) {
     return TaskListState(
       tasks: tasks ?? this.tasks,
@@ -217,6 +344,7 @@ class TaskListState {
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       loadMoreError: loadMoreError,
       total: total ?? this.total,
+      scope: scope ?? this.scope,
     );
   }
 }
@@ -226,6 +354,7 @@ class TaskNotifier extends StateNotifier<TaskListState> {
   final ReverbRealtimeService _reverb;
   final int? _userId;
   int _generation = 0;
+  TaskScope _scope = TaskScope.assignedToMe;
   String _status = 'all';
   String _search = '';
   String _priority = '';
@@ -238,22 +367,28 @@ class TaskNotifier extends StateNotifier<TaskListState> {
     _setupRealtime();
   }
 
+  TaskScope get scope => _scope;
+
   Future<void> loadTasks(
-      {String? status,
+      {TaskScope? scope,
+      String? status,
       String? search,
       String? priority,
       String? from,
       String? to,
       bool clearDateRange = false}) async {
+    _scope = scope ?? _scope;
     _status = status ?? _status;
     _search = search ?? _search;
     _priority = priority ?? _priority;
     _from = clearDateRange ? null : from ?? _from;
     _to = clearDateRange ? null : to ?? _to;
     final generation = ++_generation;
-    state = state.copyWith(isLoading: true, isLoadingMore: false, error: null);
+    state = state.copyWith(
+        isLoading: true, isLoadingMore: false, error: null, scope: _scope);
     try {
       final page = await _repo.fetchTasks(
+          scope: _scope,
           status: _status,
           search: _search,
           priority: _priority,
@@ -265,10 +400,12 @@ class TaskNotifier extends StateNotifier<TaskListState> {
           page: page.page,
           lastPage: page.lastPage,
           total: page.total,
-          isLoading: false);
+          isLoading: false,
+          scope: _scope);
     } catch (e) {
       if (!mounted || generation != _generation) return;
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+          isLoading: false, error: e.toString(), scope: _scope);
     }
   }
 
@@ -279,6 +416,7 @@ class TaskNotifier extends StateNotifier<TaskListState> {
     state = state.copyWith(isLoadingMore: true);
     try {
       final page = await _repo.fetchTasks(
+          scope: _scope,
           status: _status,
           search: _search,
           priority: _priority,

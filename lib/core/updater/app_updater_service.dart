@@ -31,11 +31,35 @@ class AppUpdaterService {
   static const String repoOwner = 'sabiliwafa27';
   static const String repoName = 'workhub_mobile_orbit';
 
-  final Dio _dio = Dio();
+  final Dio _dio;
   final ShorebirdUpdater _shorebird;
+  final Future<({String version, String buildNumber})> Function() _versionLoader;
 
-  AppUpdaterService({ShorebirdUpdater? shorebirdUpdater})
-      : _shorebird = shorebirdUpdater ?? ShorebirdUpdater();
+  AppUpdaterService({
+    Dio? dio,
+    ShorebirdUpdater? shorebirdUpdater,
+    Future<({String version, String buildNumber})> Function()? versionLoader,
+  })  : _dio = dio ?? Dio(),
+        _shorebird = shorebirdUpdater ?? ShorebirdUpdater(),
+        _versionLoader = versionLoader ?? _defaultVersionLoader;
+
+  static Future<({String version, String buildNumber})>
+      _defaultVersionLoader() async {
+    final info = await PackageInfo.fromPlatform();
+    return (version: info.version, buildNumber: info.buildNumber);
+  }
+
+  /// Resolves the effective `1.0.<run>` version for both tag-aligned builds
+  /// and legacy CI builds where `versionName` stayed `1.0.0` while
+  /// `buildNumber` tracked the GitHub Actions run number.
+  static String resolveInstalledVersion(String version, String buildNumber) {
+    final normalized = version.trim().replaceFirst(RegExp(r'^[vV]'), '');
+    final build = int.tryParse(buildNumber.trim());
+    if (normalized == '1.0.0' && build != null && build > 1) {
+      return '1.0.$build';
+    }
+    return normalized;
+  }
 
   Future<ShorebirdUpdateResult> checkForShorebirdUpdate() async {
     if (!_shorebird.isAvailable) return ShorebirdUpdateResult.unavailable;
@@ -60,8 +84,11 @@ class AppUpdaterService {
 
   Future<ReleaseInfo?> checkForUpdate() async {
     try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      final currentVersion = packageInfo.version; // e.g. 1.0.0
+      final installed = await _versionLoader();
+      final currentVersion = resolveInstalledVersion(
+        installed.version,
+        installed.buildNumber,
+      ); // e.g. 1.0.44
 
       final response = await _dio.get(
         'https://api.github.com/repos/$repoOwner/$repoName/releases/latest',

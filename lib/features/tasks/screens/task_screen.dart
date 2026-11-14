@@ -10,6 +10,7 @@ import 'task_detail_screen.dart';
 import '../widgets/task_board_row.dart';
 import '../../inbox/screens/inbox_screen.dart';
 import '../../inbox/providers/inbox_provider.dart';
+import '../../home/providers/dashboard_provider.dart';
 
 enum TaskBoardPeriod { today, week, month, overdue, all }
 
@@ -27,7 +28,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   final _scrollController = ScrollController();
   final _busyTasks = <int>{};
   bool _showFilters = false;
-  TaskBoardPeriod _period = TaskBoardPeriod.today;
+  TaskBoardPeriod _period = TaskBoardPeriod.month;
   String _status = 'all';
   String _priority = '';
   DateTimeRange? _dateRange;
@@ -43,7 +44,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     _priorityFuture = ref.read(taskRepositoryProvider).fetchPriorities();
     _ideasFuture = _loadIdeas('');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _selectPeriod(TaskBoardPeriod.today);
+      if (mounted) _selectPeriod(TaskBoardPeriod.month);
     });
   }
 
@@ -78,22 +79,27 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     super.dispose();
   }
 
-  Future<void> _selectPeriod(TaskBoardPeriod period) async {
+  (DateTime?, DateTime?) _periodRange(TaskBoardPeriod period) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    DateTime? start, end;
     if (period == TaskBoardPeriod.today) {
-      start = today;
-      end = today;
+      return (today, today);
     }
     if (period == TaskBoardPeriod.week) {
-      start = today.subtract(Duration(days: today.weekday - 1));
-      end = start.add(const Duration(days: 6));
+      final start = today.subtract(Duration(days: today.weekday - 1));
+      return (start, start.add(const Duration(days: 6)));
     }
     if (period == TaskBoardPeriod.month) {
-      start = DateTime(now.year, now.month);
-      end = DateTime(now.year, now.month + 1, 0);
+      return (
+        DateTime(now.year, now.month),
+        DateTime(now.year, now.month + 1, 0)
+      );
     }
+    return (null, null);
+  }
+
+  Future<void> _selectPeriod(TaskBoardPeriod period) async {
+    final (start, end) = _periodRange(period);
     setState(() {
       _period = period;
       _status = period == TaskBoardPeriod.overdue ? 'overdue' : 'all';
@@ -102,6 +108,19 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     });
     String date(DateTime d) => d.toIso8601String().split('T').first;
     await ref.read(taskNotifierProvider.notifier).loadTasks(
+        status: _status,
+        search: _searchController.text.trim(),
+        priority: _priority,
+        from: start == null ? null : date(start),
+        to: end == null ? null : date(end),
+        clearDateRange: start == null);
+  }
+
+  Future<void> _selectScope(TaskScope scope) async {
+    final (start, end) = _periodRange(_period);
+    String date(DateTime d) => d.toIso8601String().split('T').first;
+    await ref.read(taskNotifierProvider.notifier).loadTasks(
+        scope: scope,
         status: _status,
         search: _searchController.text.trim(),
         priority: _priority,
@@ -204,13 +223,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     final taskState = ref.watch(taskNotifierProvider);
     final user = ref.watch(authProvider).user;
     final canManageEc = user?.can('task.ec.manage') == true;
-    final showAll = _period == TaskBoardPeriod.all || _status != 'all';
-    final tasks = showAll
-        ? taskState.tasks
-        : taskState.tasks
-            .where((task) =>
-                task.status != 'completed' && task.status != 'cancelled')
-            .toList();
+    final tasks = taskState.tasks;
     final unread =
         ref.watch(inboxNotifierProvider).items.any((item) => item.isUnread);
     final photo = user?.profilePhotoUrl;
@@ -257,6 +270,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                                     color: OrbitColors.primaryNavy)))))
           ]),
       floatingActionButton: Container(
+        margin: const EdgeInsets.only(bottom: 80),
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
@@ -278,8 +292,11 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
               final created = await Navigator.of(context).push<bool>(
                   MaterialPageRoute(
                       builder: (_) => const CreateWorkItemScreen()));
-              if (created == true && mounted)
+              if (created == true && mounted) {
                 ref.read(taskNotifierProvider.notifier).loadTasks();
+                ref.invalidate(dashboardTasksProvider);
+                ref.invalidate(dashboardTaskStatsProvider);
+              }
             },
             child: const Icon(Icons.add, size: 34)),
       ),
@@ -336,6 +353,103 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                               color: OrbitColors.primaryNavy))),
                 ]),
                 const SizedBox(height: 12),
+                Container(
+                    key: const ValueKey('task-scope-toggle'),
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .18),
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: .45))),
+                    child: Row(children: [
+                      Expanded(
+                          child: Semantics(
+                              selected: taskState.scope == TaskScope.assignedToMe,
+                              button: true,
+                              child: InkWell(
+                                  onTap: () =>
+                                      _selectScope(TaskScope.assignedToMe),
+                                  borderRadius: BorderRadius.circular(99),
+                                  child: AnimatedContainer(
+                                      duration: MediaQuery
+                                              .disableAnimationsOf(context)
+                                          ? Duration.zero
+                                          : const Duration(milliseconds: 220),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8),
+                                      decoration: BoxDecoration(
+                                          color: taskState.scope ==
+                                                  TaskScope.assignedToMe
+                                              ? OrbitColors.primaryNavy
+                                              : Colors.transparent,
+                                          borderRadius:
+                                              BorderRadius.circular(99)),
+                                      child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(
+                                                Icons.person_outline_rounded,
+                                                size: 15,
+                                                color: Colors.white),
+                                            const SizedBox(width: 5),
+                                            Text('Assigned to Me',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: taskState
+                                                                .scope ==
+                                                            TaskScope
+                                                                .assignedToMe
+                                                        ? FontWeight.w700
+                                                        : FontWeight.w400,
+                                                    color: Colors.white)),
+                                          ]))))),
+                      Expanded(
+                          child: Semantics(
+                              selected: taskState.scope == TaskScope.delegatedByMe,
+                              button: true,
+                              child: InkWell(
+                                  onTap: () =>
+                                      _selectScope(TaskScope.delegatedByMe),
+                                  borderRadius: BorderRadius.circular(99),
+                                  child: AnimatedContainer(
+                                      duration: MediaQuery
+                                              .disableAnimationsOf(context)
+                                          ? Duration.zero
+                                          : const Duration(milliseconds: 220),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8),
+                                      decoration: BoxDecoration(
+                                          color: taskState.scope ==
+                                                  TaskScope.delegatedByMe
+                                              ? OrbitColors.primaryNavy
+                                              : Colors.transparent,
+                                          borderRadius:
+                                              BorderRadius.circular(99)),
+                                      child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(
+                                                Icons.people_alt_outlined,
+                                                size: 15,
+                                                color: Colors.white),
+                                            const SizedBox(width: 5),
+                                            Text('Delegated by Me',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: taskState
+                                                                .scope ==
+                                                            TaskScope
+                                                                .delegatedByMe
+                                                        ? FontWeight.w700
+                                                        : FontWeight.w400,
+                                                    color: Colors.white)),
+                                          ]))))),
+                    ])),
+                const SizedBox(height: 8),
                 Container(
                     padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
@@ -627,9 +741,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                                     child: Text(
                                         taskState.isLoading
                                             ? 'Loading tasks…'
-                                            : showAll
-                                                ? 'Tasks (${taskState.total})'
-                                                : 'Active Tasks (${tasks.length})',
+                                            : '${taskState.scope == TaskScope.delegatedByMe ? "Delegated Tasks" : "Tasks"} (${tasks.length})',
                                         style: const TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.w700,
@@ -661,9 +773,13 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                                     child: const Text(
                                         'Unable to load tasks. Tap to retry.')))
                           else if (tasks.isEmpty)
-                            const Padding(
-                                padding: EdgeInsets.all(28),
-                                child: Center(child: Text('No tasks assigned')))
+                            Padding(
+                                padding: const EdgeInsets.all(28),
+                                child: Center(
+                                    child: Text(taskState.scope ==
+                                            TaskScope.delegatedByMe
+                                        ? 'No delegated tasks found for this period'
+                                        : 'No tasks assigned for this period')))
                           else
                             for (var i = 0; i < tasks.length; i++) ...[
                               if (i > 0)
