@@ -64,9 +64,6 @@ class ReverbRealtimeService {
       final appKey = data['app_key'] as String? ?? 'erplab_reverb_key';
       _authEndpoint =
           data['auth_endpoint'] as String? ?? '/broadcasting/auth';
-      if (_authEndpoint == '/api/broadcasting/auth') {
-        _authEndpoint = '/broadcasting/auth';
-      }
 
       final wsScheme = scheme == 'https' ? 'wss' : 'ws';
       final portSuffix = (scheme == 'https' && port == 443) ||
@@ -191,26 +188,11 @@ class ReverbRealtimeService {
     try {
       final payload = <String, dynamic>{'channel': channelName};
       if (channelName.startsWith('private-')) {
-        late final dynamic responseData;
-        try {
-          final response = await _apiClient.dio.post(
-            _authEndpoint ?? '/broadcasting/auth',
-            data: {'socket_id': socketId, 'channel_name': channelName},
-          );
-          responseData = response.data;
-        } on Exception {
-          if (_authEndpoint != '/broadcasting/auth') {
-            _authEndpoint = '/broadcasting/auth';
-            final fallbackResponse = await _apiClient.dio.post(
-              '/broadcasting/auth',
-              data: {'socket_id': socketId, 'channel_name': channelName},
-            );
-            responseData = fallbackResponse.data;
-          } else {
-            rethrow;
-          }
-        }
-        final result = responseData;
+        final response = await _apiClient.dio.post(
+          _authEndpoint ?? '/broadcasting/auth',
+          data: {'socket_id': socketId, 'channel_name': channelName},
+        );
+        final result = response.data;
         if (result is! Map || result['auth'] is! String) {
           throw const FormatException(
               'Unexpected private channel auth response');

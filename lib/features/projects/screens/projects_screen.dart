@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/orbit_workspace.dart';
+import '../../../core/widgets/expanding_action_fab.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/whatsapp_colors.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../providers/project_provider.dart';
 import '../../tasks/screens/create_work_item_screen.dart';
 import '../../tasks/screens/task_detail_screen.dart';
+import '../../tasks/providers/task_provider.dart';
+import '../../tasks/widgets/task_board_row.dart';
 
 class ProjectsScreen extends ConsumerStatefulWidget {
   const ProjectsScreen({super.key});
@@ -18,10 +21,10 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   @override
   Widget build(BuildContext context) {
     final projectState = ref.watch(projectNotifierProvider);
-    final displayProjects = projectState.projects;
+    final allProjects = projectState.projects;
 
     return OrbitWorkspaceScaffold(
-      subtitle: 'Company initiatives & milestones',
+      subtitle: 'Projects & Milestones',
       backgroundColor: Colors.transparent,
       headerIcon: Icons.hub_outlined,
       appBar: AppBar(title: const Text('WorkHub Projects')),
@@ -33,25 +36,6 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                    color: const Color(0xFFD6DFFF),
-                    borderRadius: BorderRadius.circular(999)),
-                child: Text(
-                  'COMPANY INITIATIVES (${displayProjects.length})',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.3,
-                    color: OrbitColors.textNavy,
-                  ),
-                ),
-              ),
-            ),
             const SizedBox(height: 8),
             if (projectState.isLoading)
               const Center(
@@ -69,7 +53,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                   child: const Text('Unable to load projects. Tap to retry.'),
                 ),
               )
-            else if (displayProjects.isEmpty)
+            else if (allProjects.isEmpty)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 40, horizontal: 20),
@@ -79,7 +63,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                           size: 48, color: WhatsAppColors.subtitleText),
                       SizedBox(height: 12),
                       Text(
-                        'No company initiatives found',
+                        'No projects found',
                         style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -100,10 +84,10 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: displayProjects.length,
+                itemCount: allProjects.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
-                  final project = displayProjects[index];
+                  final project = allProjects[index];
                   return _buildProjectCard(project);
                 },
               ),
@@ -196,34 +180,88 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   }
 }
 
-class ProjectTasksScreen extends ConsumerWidget {
+class ProjectTasksScreen extends ConsumerStatefulWidget {
   final ProjectItemModel project;
 
   const ProjectTasksScreen({super.key, required this.project});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tasks = ref.watch(projectTasksProvider(project.id));
+  ConsumerState<ProjectTasksScreen> createState() => _ProjectTasksScreenState();
+}
+
+class _ProjectTasksScreenState extends ConsumerState<ProjectTasksScreen> {
+  final _busyTasks = <int>{};
+
+  Future<void> _taskAction(TaskItemModel task) async {
+    if (_busyTasks.contains(task.id)) return;
+    setState(() => _busyTasks.add(task.id));
+    try {
+      final repository = ref.read(taskRepositoryProvider);
+      final review = task.rowAction == 'request_review';
+      final success = review
+          ? await repository.requestReview(task.id)
+          : await repository.completeTask(task.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(success
+              ? review
+                  ? 'Review requested.'
+                  : 'Task completed.'
+              : review
+                  ? 'Could not request review. Refresh and try again.'
+                  : 'Could not complete task. Refresh and try again.')));
+      if (success) {
+        ref.invalidate(projectTasksProvider(widget.project.id));
+        ref.read(taskNotifierProvider.notifier).loadTasks();
+      }
+    } finally {
+      if (mounted) setState(() => _busyTasks.remove(task.id));
+    }
+  }
+
+  Future<void> _addPriority(TaskItemModel task) async {
+    if (_busyTasks.contains(task.id)) return;
+    setState(() => _busyTasks.add(task.id));
+    try {
+      await ref.read(taskRepositoryProvider).addPriority(task.id);
+      if (!mounted) return;
+      ref.invalidate(projectTasksProvider(widget.project.id));
+      ref.read(taskNotifierProvider.notifier).loadTasks();
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Added to personal priority.')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to update task priority.')));
+    } finally {
+      if (mounted) setState(() => _busyTasks.remove(task.id));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = ref.watch(projectTasksProvider(widget.project.id));
     return OrbitWorkspaceScaffold(
       subtitle: 'Company initiatives & milestones',
-      appBar: AppBar(title: Text(project.name)),
-      floatingActionButton: FloatingActionButton.large(
+      appBar: AppBar(title: Text(widget.project.name)),
+      floatingActionButton: OrbitPlusFab(
         heroTag: 'project-tasks-fab',
         tooltip: 'Create project task',
         onPressed: () async {
           final created = await Navigator.of(context).push<bool>(
               MaterialPageRoute(
-                  builder: (_) => CreateWorkItemScreen(projectId: project.id)));
+                  builder: (_) =>
+                      CreateWorkItemScreen(projectId: widget.project.id)));
           if (created == true && context.mounted)
-            ref.invalidate(projectTasksProvider(project.id));
+            ref.invalidate(projectTasksProvider(widget.project.id));
         },
-        child: const Icon(Icons.add),
       ),
       body: tasks.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => Center(
           child: TextButton(
-            onPressed: () => ref.invalidate(projectTasksProvider(project.id)),
+            onPressed: () =>
+                ref.invalidate(projectTasksProvider(widget.project.id)),
             child: const Text('Unable to load project tasks. Tap to retry.'),
           ),
         ),
@@ -251,7 +289,7 @@ class ProjectTasksScreen extends ConsumerWidget {
                         child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(project.name,
+                        Text(widget.project.name,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -266,71 +304,41 @@ class ProjectTasksScreen extends ConsumerWidget {
                   ]),
                 ),
                 Expanded(
-                    child: ListView.builder(
+                    child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final task = items[index];
-                    final complete = task.progressPercent >= 100;
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(24),
-                        onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    TaskDetailScreen(taskId: task.id))),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: complete
-                                    ? OrbitColors.primaryNavy
-                                    : Colors.transparent,
-                                border: Border.all(
-                                    color: complete
-                                        ? OrbitColors.primaryNavy
-                                        : OrbitColors.textMuted),
-                                borderRadius: BorderRadius.circular(9),
-                              ),
-                              child: complete
-                                  ? const Icon(Icons.check,
-                                      size: 20, color: Colors.white)
+                  children: [
+                    OrbitSurface(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          for (var index = 0;
+                              index < items.length;
+                              index++) ...[
+                            if (index > 0)
+                              const Divider(
+                                  height: 1, indent: 14, endIndent: 14),
+                            TaskBoardRow(
+                              task: items[index],
+                              busy: _busyTasks.contains(items[index].id),
+                              onOpen: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                      builder: (_) => TaskDetailScreen(
+                                          taskId: items[index].id))),
+                              onAction: _busyTasks.contains(items[index].id) ||
+                                      !const ['complete', 'request_review']
+                                          .contains(items[index].rowAction)
+                                  ? null
+                                  : () => _taskAction(items[index]),
+                              onPriority: items[index].priorityEligible &&
+                                      !items[index].isPersonalPriority
+                                  ? () => _addPriority(items[index])
                                   : null,
                             ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                                child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(task.title,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: OrbitColors.textNavy,
-                                      decoration: complete
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                    )),
-                                const SizedBox(height: 4),
-                                Text(task.status.replaceAll('_', ' '),
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: OrbitColors.textSecondary)),
-                              ],
-                            )),
-                            const SizedBox(width: 8),
-                            Text('${task.progressPercent}%',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: OrbitColors.primaryNavy)),
-                          ]),
-                        ),
+                          ],
+                        ],
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 )),
               ]),
       ),

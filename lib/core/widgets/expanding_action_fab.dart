@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/orbit_theme.dart';
 
 class ExpandingFabAction {
   const ExpandingFabAction(
@@ -8,84 +9,55 @@ class ExpandingFabAction {
   final VoidCallback onPressed;
 }
 
-class GoogleKeepPlusPainter extends CustomPainter {
-  final double strokeWidth;
-  final double length;
-  final double cornerRadius;
+class OrbitPlusFab extends StatelessWidget {
+  final VoidCallback onPressed;
+  final String? tooltip;
+  final String? heroTag;
+  final bool isExpanded;
 
-  const GoogleKeepPlusPainter({
-    this.strokeWidth = 4.6,
-    this.length = 11.5,
-    this.cornerRadius = 2.3,
+  const OrbitPlusFab({
+    super.key,
+    required this.onPressed,
+    this.tooltip,
+    this.heroTag,
+    this.isExpanded = false,
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final halfStroke = strokeWidth / 2;
-
-    // Google Brand Colors (Blue, Red, Yellow, Green)
-    const blue = Color(0xFF4285F4);
-    const red = Color(0xFFEA4335);
-    const yellow = Color(0xFFFBBC05);
-    const green = Color(0xFF34A853);
-
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    // Top arm (Blue)
-    paint.color = blue;
-    canvas.drawRRect(
-      RRect.fromRectAndCorners(
-        Rect.fromLTRB(center.dx - halfStroke, center.dy - length,
-            center.dx + halfStroke, center.dy + halfStroke),
-        topLeft: Radius.circular(cornerRadius),
-        topRight: Radius.circular(cornerRadius),
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x3306244D),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
-      paint,
-    );
-
-    // Left arm (Red)
-    paint.color = red;
-    canvas.drawRRect(
-      RRect.fromRectAndCorners(
-        Rect.fromLTRB(center.dx - length, center.dy - halfStroke,
-            center.dx + halfStroke, center.dy + halfStroke),
-        topLeft: Radius.circular(cornerRadius),
-        bottomLeft: Radius.circular(cornerRadius),
+      child: FloatingActionButton(
+        heroTag: heroTag,
+        elevation: 0,
+        highlightElevation: 0,
+        shape: const CircleBorder(),
+        backgroundColor: OrbitColors.primaryNavy,
+        foregroundColor: Colors.white,
+        tooltip: tooltip,
+        onPressed: onPressed,
+        child: AnimatedRotation(
+          turns: isExpanded ? 0.125 : 0.0,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.fastOutSlowIn,
+          child: const Icon(
+            Icons.add,
+            size: 32,
+            color: Colors.white,
+          ),
+        ),
       ),
-      paint,
-    );
-
-    // Bottom arm (Yellow)
-    paint.color = yellow;
-    canvas.drawRRect(
-      RRect.fromRectAndCorners(
-        Rect.fromLTRB(center.dx - halfStroke, center.dy - halfStroke,
-            center.dx + halfStroke, center.dy + length),
-        bottomLeft: Radius.circular(cornerRadius),
-        bottomRight: Radius.circular(cornerRadius),
-      ),
-      paint,
-    );
-
-    // Right arm (Green)
-    paint.color = green;
-    canvas.drawRRect(
-      RRect.fromRectAndCorners(
-        Rect.fromLTRB(center.dx - halfStroke, center.dy - halfStroke,
-            center.dx + length, center.dy + halfStroke),
-        topRight: Radius.circular(cornerRadius),
-        bottomRight: Radius.circular(cornerRadius),
-      ),
-      paint,
     );
   }
-
-  @override
-  bool shouldRepaint(covariant GoogleKeepPlusPainter oldDelegate) =>
-      strokeWidth != oldDelegate.strokeWidth ||
-      length != oldDelegate.length ||
-      cornerRadius != oldDelegate.cornerRadius;
 }
 
 class ExpandingActionFab extends StatefulWidget {
@@ -247,33 +219,12 @@ class _ExpandingActionFabState extends State<ExpandingActionFab>
               ),
             ),
           ),
-          FloatingActionButton(
+          OrbitPlusFab(
             heroTag: 'inbox-fab',
-            elevation: 5,
-            highlightElevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-            backgroundColor: Colors.white,
             tooltip: _expanded ? 'Close actions' : 'Create task, EC or chat',
+            isExpanded: _expanded,
             onPressed: () =>
                 _expanded ? _controller.reverse() : _controller.forward(),
-            child: AnimatedRotation(
-              turns: _expanded ? 0.125 : 0.0,
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.fastOutSlowIn,
-              child: SizedBox(
-                width: 26,
-                height: 26,
-                child: CustomPaint(
-                  painter: const GoogleKeepPlusPainter(
-                    strokeWidth: 4.6,
-                    length: 11.5,
-                    cornerRadius: 2.3,
-                  ),
-                ),
-              ),
-            ),
           ),
         ],
       );

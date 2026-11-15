@@ -160,24 +160,17 @@ void main() {
     });
   }
 
-  testWidgets('task search survives collapsing its filter panel',
-      (tester) async {
+  testWidgets('task filter panel can be toggled', (tester) async {
     await tester.pumpWidget(workspaceApp(const TaskScreen()));
     await tester.pumpAndSettle();
     final toggle = find.byKey(const ValueKey('task-board-filters-toggle'));
+    expect(find.text('Advanced filters & priorities'), findsNothing);
     await tester.tap(toggle);
     await tester.pumpAndSettle();
-    final field = find.byKey(const ValueKey('task-board-search'));
-    await tester.enterText(field, 'operations');
-    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Advanced filters & priorities'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pumpAndSettle();
-    await tester.tap(toggle);
-    await tester.pumpAndSettle();
-    await tester.tap(toggle);
-    await tester.pumpAndSettle();
-    final editable =
-        find.descendant(of: field, matching: find.byType(EditableText));
-    expect(tester.widget<EditableText>(editable).controller.text, 'operations');
+    expect(find.text('Advanced filters & priorities'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

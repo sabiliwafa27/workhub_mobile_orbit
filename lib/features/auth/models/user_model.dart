@@ -1,6 +1,7 @@
 class UserModel {
   final int id;
   final String name;
+  final String? preferredName;
   final String email;
   final int? employeeId;
   final String? employeeUuid;
@@ -11,10 +12,12 @@ class UserModel {
   final String? department;
   final List<String> permissions;
   final Map<String, dynamic> modules;
+  final Map<String, dynamic>? rawJson;
 
   UserModel({
     required this.id,
     required this.name,
+    this.preferredName,
     required this.email,
     this.employeeId,
     this.employeeUuid,
@@ -25,6 +28,7 @@ class UserModel {
     this.department,
     required this.permissions,
     required this.modules,
+    this.rawJson,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -53,6 +57,7 @@ class UserModel {
     return UserModel(
       id: json['id'] as int? ?? 0,
       name: json['name'] as String? ?? '',
+      preferredName: (json['preferred_name'] as String?)?.trim(),
       email: emailStr,
       employeeId: json['employee_id'] as int?,
       employeeUuid: json['employee_uuid'] as String?,
@@ -65,6 +70,7 @@ class UserModel {
       department: json['department'] as String? ?? json['division'] as String?,
       permissions: perms,
       modules: mods,
+      rawJson: json,
     );
   }
 

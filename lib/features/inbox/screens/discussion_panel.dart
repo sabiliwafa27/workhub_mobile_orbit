@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/orbit_workspace.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/widgets/attachment_preview_tile.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../../../core/realtime/reverb_service.dart';
@@ -264,10 +265,29 @@ class _InboxDiscussionState extends ConsumerState<InboxDiscussion> {
                                 color: OrbitColors.textNavy)),
                         subtitle: Padding(
                             padding: const EdgeInsets.only(top: 8),
-                            child: Text((item['body'] ?? '').toString(),
-                                style: const TextStyle(
-                                    fontSize: 15,
-                                    color: OrbitColors.textPrimary))),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if ((item['body'] ?? '').toString().isNotEmpty)
+                                  Text(
+                                    (item['body'] ?? '').toString(),
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      color: OrbitColors.textPrimary,
+                                    ),
+                                  ),
+                                if (item['attachments'] is List &&
+                                    (item['attachments'] as List).isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  for (final att in (item['attachments'] as List)
+                                      .whereType<Map>())
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 6),
+                                      child: AttachmentPreviewTile.fromMap(att),
+                                    ),
+                                ],
+                              ],
+                            )),
                       );
                     }),
                 ])),

@@ -71,9 +71,9 @@ class WorkHubNavigationBar extends StatelessWidget {
                         selectedIcon: Icon(Icons.folder),
                         label: 'Projects'),
                     const NavigationDestination(
-                        icon: Icon(Icons.grid_view_outlined),
-                        selectedIcon: Icon(Icons.grid_view_rounded),
-                        label: 'ERPa'),
+                        icon: Icon(Icons.mail_outline_rounded),
+                        selectedIcon: Icon(Icons.mail_rounded),
+                        label: 'Mail'),
                   ],
                 ),
               ),

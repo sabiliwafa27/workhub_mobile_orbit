@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/realtime/reverb_service.dart';
@@ -42,28 +43,66 @@ class TaskItemModel {
   });
 
   factory TaskItemModel.fromJson(Map<String, dynamic> json) {
+    // Robust status extraction: string or Map like {status_name: ...}
+    String status = 'in_progress';
+    if (json['status'] is String) {
+      status = json['status'] as String;
+    } else if (json['status'] is Map && json['status']['status_name'] != null) {
+      status = json['status']['status_name'].toString();
+    } else if (json['status_name'] != null) {
+      status = json['status_name'].toString();
+    }
+
+    // Robust project name extraction
+    String? projectName = json['project_name'] as String?;
+    if (projectName == null && json['project'] is Map) {
+      projectName = (json['project'] as Map)['name']?.toString();
+    }
+
+    // Robust assignees extraction
+    final List<String> assignees = [];
+    if (json['assignees'] is List) {
+      for (final person in (json['assignees'] as List)) {
+        if (person is Map) {
+          if (person['full_name'] != null &&
+              person['full_name'].toString().isNotEmpty) {
+            assignees.add(person['full_name'].toString());
+          } else if (person['employee'] is Map &&
+              person['employee']['full_name'] != null) {
+            final name = person['employee']['full_name'].toString();
+            if (name.isNotEmpty) assignees.add(name);
+          } else if (person['name'] != null) {
+            assignees.add(person['name'].toString());
+          }
+        } else if (person is String && person.isNotEmpty) {
+          assignees.add(person);
+        }
+      }
+    } else if (json['assignee'] is Map) {
+      final a = json['assignee'] as Map;
+      final name = (a['full_name'] ?? a['name'])?.toString();
+      if (name != null && name.isNotEmpty) assignees.add(name);
+    } else if (json['assigned_to'] != null) {
+      assignees.add(json['assigned_to'].toString());
+    }
+
     return TaskItemModel(
       id: json['task_id'] as int? ?? json['id'] as int? ?? 0,
       title: json['title'] as String? ?? json['subject'] as String? ?? 'Task',
       description:
           json['description'] as String? ?? json['detail'] as String? ?? '',
-      status: json['status'] as String? ?? 'in_progress',
+      status: status,
       progressPercent:
           json['progress_percent'] as int? ?? json['progress'] as int? ?? 0,
       dueDate: json['due_date'] as String? ?? '',
       priority: json['priority'] as String? ?? 'medium',
-      projectName: json['project_name'] as String?,
+      projectName: projectName,
       rowAction: json['row_action'] as String?,
       hasPendingReview: json['has_pending_review'] == true,
       priorityEligible: json['personal_priority_eligible'] == true,
       isPersonalPriority: json['personal_priority_position'] != null,
       attachmentCount: (json['attachment_count'] as num?)?.toInt() ?? 0,
-      assignees:
-          (json['assignees'] is List ? json['assignees'] as List : const [])
-              .whereType<Map>()
-              .map((person) => (person['full_name'] ?? '').toString())
-              .where((name) => name.isNotEmpty)
-              .toList(),
+      assignees: assignees,
     );
   }
 
@@ -123,37 +162,64 @@ class TaskRepository {
       );
     }
     try {
-      final response = await _apiClient.dio.get('/tasks', queryParameters: {
-        'status': status,
-        'search': search,
-        if (priority.isNotEmpty) 'priority': priority,
-        if (from != null) 'from': from,
-        if (to != null) 'to': to,
-        'page': page,
-        'per_page': 25,
-      });
-      if (response.data is Map) {
-        final raw = response.data['data'] ??
-            response.data['tasks'] ??
-            response.data['incomplete'];
-        if (raw is List) {
-          final meta = response.data['meta'];
-          return TaskPage(
-            tasks: raw
-                .map((json) =>
-                    TaskItemModel.fromJson(json as Map<String, dynamic>))
-                .toList(),
-            page: meta is Map
-                ? (meta['current_page'] as num? ?? page).toInt()
-                : page,
-            lastPage: meta is Map
-                ? (meta['last_page'] as num? ?? page).toInt()
-                : page,
-            total: meta is Map
-                ? (meta['total'] as num? ?? raw.length).toInt()
-                : raw.length,
-          );
+      dynamic responseData;
+      try {
+        final response = await _apiClient.dio.get('/tasks', queryParameters: {
+          'status': status,
+          'search': search,
+          if (priority.isNotEmpty) 'priority': priority,
+          if (from != null) 'from': from,
+          if (to != null) 'to': to,
+          'page': page,
+          'per_page': 25,
+        });
+        responseData = response.data;
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 404) {
+          final myResponse =
+              await _apiClient.dio.get('/tasks/my', queryParameters: {
+            if (status != 'all') 'status': status,
+            if (search.isNotEmpty) 'search': search,
+            if (priority.isNotEmpty) 'priority': priority,
+            if (from != null) 'from': from,
+            if (to != null) 'to': to,
+            'page': page,
+            'per_page': 25,
+          });
+          responseData = myResponse.data;
+        } else {
+          rethrow;
         }
+      }
+
+      if (responseData is Map || responseData is List) {
+        final List raw;
+        Map? meta;
+        if (responseData is List) {
+          raw = responseData;
+        } else {
+          final map = responseData as Map;
+          raw =
+              (map['data'] ?? map['tasks'] ?? map['incomplete'] ?? []) as List;
+          meta = map['meta'] as Map?;
+        }
+
+        var parsedTasks = raw
+            .map((json) =>
+                TaskItemModel.fromJson(Map<String, dynamic>.from(json as Map)))
+            .toList();
+
+        return TaskPage(
+          tasks: parsedTasks,
+          page: meta is Map
+              ? (meta['current_page'] as num? ?? page).toInt()
+              : page,
+          lastPage:
+              meta is Map ? (meta['last_page'] as num? ?? page).toInt() : page,
+          total: meta is Map
+              ? (meta['total'] as num? ?? parsedTasks.length).toInt()
+              : parsedTasks.length,
+        );
       }
       throw const FormatException('Unexpected task list response');
     } catch (_) {
@@ -170,72 +236,123 @@ class TaskRepository {
     int page = 1,
   }) async {
     try {
-      final view = status == 'completed'
-          ? 'complete'
-          : (status == 'open' || status == 'in_progress' || status == 'overdue')
-              ? 'incomplete'
-              : 'all';
-      final response = await _apiClient.dio.get(
-        '/api/v1/inbox/todos',
-        queryParameters: {
-          'view': view,
+      dynamic responseData;
+      // Try dedicated endpoint /tasks/assigned first
+      try {
+        final assignedResponse =
+            await _apiClient.dio.get('/tasks/assigned', queryParameters: {
+          if (status != 'all') 'status': status,
           if (search.isNotEmpty) 'search': search,
-        },
-      );
-      if (response.data is Map) {
-        final data = response.data as Map;
-        final raw =
-            data['tasks'] ?? data[view] ?? data['incomplete'] ?? data['data'];
-        if (raw is List) {
-          final now = DateTime.now();
-          final todayStr =
-              '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+          if (priority.isNotEmpty) 'priority': priority,
+          'page': page,
+          'per_page': 25,
+        });
+        if (assignedResponse.data is Map || assignedResponse.data is List) {
+          responseData = assignedResponse.data;
+        } else {
+          throw FormatException(
+              'Unexpected response type: ${assignedResponse.data.runtimeType}');
+        }
+      } catch (e) {
+        // Fallback to inbox delegated tasks
+        final view = status == 'completed'
+            ? 'complete'
+            : (status == 'open' ||
+                    status == 'in_progress' ||
+                    status == 'overdue')
+                ? 'incomplete'
+                : 'all';
+        final response = await _apiClient.dio.get(
+          '/inbox/api/todos',
+          queryParameters: {
+            'view': view,
+            if (search.isNotEmpty) 'search': search,
+          },
+        );
+        responseData = response.data;
+      }
 
-          var items = raw
+      if (responseData is Map || responseData is List) {
+        final List raw;
+        Map? meta;
+        bool isFromInbox = false;
+
+        if (responseData is List) {
+          raw = responseData;
+        } else {
+          final map = responseData as Map;
+          raw =
+              (map['data'] ?? map['tasks'] ?? map['incomplete'] ?? []) as List;
+          meta = map['meta'] as Map?;
+          if (map.containsKey('view') ||
+              raw.any((item) =>
+                  item is Map &&
+                  item['id'].toString().startsWith('task-assigned-'))) {
+            isFromInbox = true;
+          }
+        }
+
+        final now = DateTime.now();
+        final todayStr =
+            '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+        List<TaskItemModel> items;
+        if (isFromInbox) {
+          items = raw
               .whereType<Map>()
               .where(
                   (item) => item['id'].toString().startsWith('task-assigned-'))
               .map((json) =>
                   TaskItemModel.fromInboxJson(Map<String, dynamic>.from(json)))
               .toList();
-
-          if (status == 'overdue') {
-            items = items.where((t) {
-              final isComplete = t.status == 'completed';
-              return !isComplete &&
-                  (t.status == 'overdue' ||
-                      (t.dueDate.isNotEmpty &&
-                          t.dueDate.compareTo(todayStr) < 0));
-            }).toList();
-          } else if (from != null && to != null) {
-            items = items.where((t) {
-              if (t.dueDate.isEmpty) return true;
-              return t.dueDate.compareTo(from) >= 0 &&
-                  t.dueDate.compareTo(to) <= 0;
-            }).toList();
-          }
-
-          if (priority.isNotEmpty) {
-            items = items
-                .where(
-                    (t) => t.priority.toLowerCase() == priority.toLowerCase())
-                .toList();
-          }
-
-          const perPage = 25;
-          final total = items.length;
-          final lastPage = (total / perPage).ceil().clamp(1, 999);
-          final startIndex = ((page - 1) * perPage).clamp(0, total);
-          final endIndex = (startIndex + perPage).clamp(0, total);
-          final paginated = items.sublist(startIndex, endIndex);
-
-          return TaskPage(
-            tasks: paginated,
-            page: page,
-            lastPage: lastPage,
-            total: total,
-          );
+        } else {
+          items = raw
+              .whereType<Map>()
+              .map((json) =>
+                  TaskItemModel.fromJson(Map<String, dynamic>.from(json)))
+              .toList();
         }
+
+        if (status == 'overdue') {
+          items = items.where((t) {
+            final isComplete = t.status == 'completed';
+            return !isComplete &&
+                (t.status == 'overdue' ||
+                    (t.dueDate.isNotEmpty &&
+                        t.dueDate.compareTo(todayStr) < 0));
+          }).toList();
+        } else if (from != null && to != null) {
+          items = items.where((t) {
+            if (t.dueDate.isEmpty) return true;
+            final due = t.dueDate.split('T').first;
+            return due.compareTo(from) >= 0 && due.compareTo(to) <= 0;
+          }).toList();
+        }
+
+        if (priority.isNotEmpty) {
+          items = items
+              .where((t) => t.priority.toLowerCase() == priority.toLowerCase())
+              .toList();
+        }
+
+        const perPage = 25;
+        final total = meta != null && meta['total'] != null
+            ? (meta['total'] as num).toInt()
+            : items.length;
+        final lastPage = meta != null && meta['last_page'] != null
+            ? (meta['last_page'] as num).toInt()
+            : (total / perPage).ceil().clamp(1, 999);
+        final startIndex = ((page - 1) * perPage).clamp(0, items.length);
+        final endIndex = (startIndex + perPage).clamp(0, items.length);
+        final paginated =
+            meta != null ? items : items.sublist(startIndex, endIndex);
+
+        return TaskPage(
+          tasks: paginated,
+          page: page,
+          lastPage: lastPage,
+          total: total,
+        );
       }
       return TaskPage(tasks: [], page: 1, lastPage: 1, total: 0);
     } catch (_) {
@@ -256,21 +373,45 @@ class TaskRepository {
   }
 
   Future<Map<String, dynamic>> fetchPriorities() async {
-    final response = await _apiClient.dio.get('/tasks/priorities');
-    if (response.data is! Map)
-      throw const FormatException('Unexpected priority response');
-    return Map<String, dynamic>.from(response.data as Map);
+    try {
+      final response = await _apiClient.dio.get('/tasks/my/priorities');
+      if (response.data is List) {
+        return {'data': response.data};
+      } else if (response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+    } catch (_) {
+      try {
+        final fallback = await _apiClient.dio.get('/tasks/priorities');
+        if (fallback.data is Map) {
+          return Map<String, dynamic>.from(fallback.data as Map);
+        }
+      } catch (_) {}
+    }
+    return {'data': []};
   }
 
-  Future<void> addPriority(int taskId) async =>
-      _apiClient.dio.post('/tasks/priorities/$taskId');
-  Future<void> removePriority(int taskId) async =>
-      _apiClient.dio.delete('/tasks/priorities/$taskId');
+  Future<void> addPriority(int taskId) async {
+    try {
+      await _apiClient.dio.post('/tasks/my/priorities/$taskId');
+    } catch (_) {
+      await _apiClient.dio.post('/tasks/priorities/$taskId');
+    }
+  }
+
+  Future<void> removePriority(int taskId) async {
+    try {
+      await _apiClient.dio.delete('/tasks/my/priorities/$taskId');
+    } catch (_) {
+      await _apiClient.dio.delete('/tasks/priorities/$taskId');
+    }
+  }
 
   Future<bool> completeTask(int taskId) async {
     try {
       final response = await _apiClient.dio.post('/tasks/$taskId/complete');
-      return response.statusCode == 200;
+      final statusCode = response.statusCode;
+      return statusCode != null && statusCode >= 200 && statusCode < 300;
     } catch (_) {
       return false;
     }
@@ -404,8 +545,8 @@ class TaskNotifier extends StateNotifier<TaskListState> {
           scope: _scope);
     } catch (e) {
       if (!mounted || generation != _generation) return;
-      state = state.copyWith(
-          isLoading: false, error: e.toString(), scope: _scope);
+      state =
+          state.copyWith(isLoading: false, error: e.toString(), scope: _scope);
     }
   }
 

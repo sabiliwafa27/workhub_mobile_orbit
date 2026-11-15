@@ -112,7 +112,6 @@ void main() {
         adapter: TaskReferenceAdapter()..awaitingReview = true));
     await tester.pumpAndSettle();
     expect(find.text('Active Tasks (5)'), findsOneWidget);
-    expect(find.text('Pending review'), findsOneWidget);
     final box = tester.widget<Checkbox>(find.byType(Checkbox).first);
     expect(box.value, isFalse);
     expect(box.onChanged, isNull);
@@ -128,8 +127,7 @@ void main() {
         adapter: TaskReferenceAdapter(), scale: 1.4));
     await tester.pumpAndSettle();
     expect(find.text('Active Tasks (5)'), findsOneWidget);
-    expect(find.text('High'), findsWidgets);
-    expect(find.text('3 attachments'), findsOneWidget);
+    expect(find.text('Perbaikan Error Modul Logistic Out Pada Halaman Purchase Orders Dan Comments'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

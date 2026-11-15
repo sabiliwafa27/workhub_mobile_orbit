@@ -8,6 +8,7 @@ import '../../../core/theme/orbit_theme.dart';
 import '../../../core/theme/orbit_motion.dart';
 import '../providers/dashboard_provider.dart';
 import 'orbit_dashboard_components.dart';
+import 'home_calendar_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
@@ -15,6 +16,8 @@ import '../../tasks/providers/task_provider.dart';
 import '../../tasks/providers/ec_progress_provider.dart';
 import '../../tasks/screens/create_work_item_screen.dart';
 import '../../tasks/screens/task_detail_screen.dart';
+import '../../auth/screens/profile_screen.dart';
+import '../../../core/widgets/whatsapp_popup_menu.dart';
 import '../../visits/models/visit_target_model.dart';
 import '../../visits/services/visit_service.dart';
 
@@ -230,7 +233,8 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
-    final userName = user?.name.split(' ').first ?? 'User';
+    final preferredName = user?.preferredName?.trim();
+    final userName = preferredName?.isNotEmpty == true ? preferredName : null;
     final taskState = ref.watch(dashboardTasksProvider(_period));
     final dashboardInbox = ref.watch(_dashboardInboxProvider);
     final inbox = dashboardInbox.valueOrNull;
@@ -382,12 +386,6 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                       },
                     ),
                   ],
-                  const SizedBox(height: 20),
-
-                  // 8. Live Unified Inbox & Approvals Section
-                  _buildPendingInboxSection(inboxState),
-                  const SizedBox(height: 20),
-
                   // 9. Today's Scheduled Visits (only if visit targets exist)
                   if (visitTargets.isNotEmpty) ...[
                     _buildTodayVisitsSection(visitTargets),
@@ -430,7 +428,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     }
   }
 
-  Widget _buildReferenceHeader(String name) {
+  Widget _buildReferenceHeader(String? name) {
     final hour = DateTime.now().hour;
     final greeting = hour < 11
         ? 'Good Morning'
@@ -446,20 +444,20 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
           tooltip: label,
           onPressed: onTap,
           padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
           icon: Container(
-              width: 30,
-              height: 30,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: .08),
+                  color: Colors.white.withValues(alpha: .10),
                   border:
-                      Border.all(color: Colors.white.withValues(alpha: .25))),
+                      Border.all(color: Colors.white.withValues(alpha: .30))),
               child: Badge(
                   isLabelVisible: badge,
                   backgroundColor: OrbitColors.kpiRed,
                   child: Center(
-                      child: Icon(icon, size: 18, color: Colors.white)))),
+                      child: Icon(icon, size: 21, color: Colors.white)))),
         );
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -488,43 +486,120 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     fontWeight: FontWeight.w700,
                     color: Colors.white))),
         action(Icons.search_rounded, 'Search workspace', widget.onOpenSearch),
-        action(Icons.notifications_none_rounded, 'Notifications',
-            widget.onOpenNotifications,
-            badge: (ref
-                        .watch(_dashboardInboxProvider)
-                        .valueOrNull
-                        ?.incompleteUnreadCount ??
-                    0) >
-                0),
-        action(Icons.grid_view_rounded, 'ERP workspace',
-            widget.onOpenErp ?? widget.onOpenNotifications),
-        IconButton(
-            tooltip: 'My profile',
-            onPressed: widget.onOpenProfile ?? widget.onOpenCheckIn,
-            padding: const EdgeInsets.only(left: 5),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
-            icon: CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.white,
-                child: ClipOval(
+        Builder(
+          builder: (avatarContext) {
+            return GestureDetector(
+              onTap: () async {
+                final RenderBox button =
+                    avatarContext.findRenderObject()! as RenderBox;
+                final RenderBox overlay = Overlay.of(avatarContext)
+                    .context
+                    .findRenderObject()! as RenderBox;
+                final RelativeRect position = RelativeRect.fromRect(
+                  Rect.fromPoints(
+                    button.localToGlobal(Offset(0, button.size.height + 4),
+                        ancestor: overlay),
+                    button.localToGlobal(button.size.bottomRight(Offset.zero),
+                        ancestor: overlay),
+                  ),
+                  Offset.zero & overlay.size,
+                );
+
+                final value = await showWhatsAppMenu<String>(
+                  context: avatarContext,
+                  position: position,
+                  items: const [
+                    WhatsAppMenuItem(
+                      value: 'profile',
+                      title: 'My Profile',
+                      icon: Icons.person_outline_rounded,
+                      iconColor: Color(0xFF54656F),
+                      textColor: Color(0xFF111B21),
+                    ),
+                    WhatsAppMenuItem(
+                      value: 'logout',
+                      title: 'Logout',
+                      icon: Icons.logout_rounded,
+                      iconColor: Color(0xFFEA0038),
+                      textColor: Color(0xFFEA0038),
+                    ),
+                  ],
+                );
+
+                if (!mounted || value == null) return;
+                if (value == 'profile') {
+                  if (widget.onOpenProfile != null) {
+                    widget.onOpenProfile!();
+                  } else {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                    );
+                  }
+                } else if (value == 'logout') {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (dCtx) => AlertDialog(
+                      title: const Text('Sign Out'),
+                      content: const Text(
+                          'Are you sure you want to sign out from WorkHub?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dCtx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(dCtx, true),
+                          style:
+                              TextButton.styleFrom(foregroundColor: Colors.red),
+                          child: const Text('Sign Out'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await ref.read(authProvider.notifier).logout();
+                  }
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: CircleAvatar(
+                  radius: 19,
+                  backgroundColor: Colors.white,
+                  child: ClipOval(
                     child: photo == null || photo.isEmpty
-                        ? Text(name.isEmpty ? 'U' : name[0].toUpperCase(),
+                        ? Text(
+                            name?.isNotEmpty == true
+                                ? name![0].toUpperCase()
+                                : 'U',
                             style: const TextStyle(
-                                color: OrbitColors.primaryNavy,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700))
-                        : Image.network(photo,
-                            width: 30,
-                            height: 30,
+                              color: OrbitColors.primaryNavy,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          )
+                        : Image.network(
+                            photo,
+                            width: 36,
+                            height: 36,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => const Icon(
-                                Icons.person_outline,
-                                color: OrbitColors.primaryNavy))))),
+                              Icons.person_outline,
+                              color: OrbitColors.primaryNavy,
+                              size: 22,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ]),
       const SizedBox(height: 12),
       Row(children: [
         Flexible(
-            child: Text('$greeting, $name',
+            child: Text(name == null ? greeting : '$greeting, $name',
                 style: const TextStyle(
                     fontSize: 20,
                     height: 1.15,
@@ -589,9 +664,6 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
         Expanded(
             flex: 2,
             child: Row(children: [
-              const Icon(Icons.calendar_today_outlined,
-                  size: 16, color: Colors.white),
-              const SizedBox(width: 5),
               Expanded(
                   child: FittedBox(
                       fit: BoxFit.scaleDown,
@@ -600,6 +672,19 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                           DateFormat('EEE, dd MMM yyyy').format(DateTime.now()),
                           style: const TextStyle(
                               fontSize: 11, color: Colors.white)))),
+              const SizedBox(width: 5),
+              IconButton(
+                tooltip: 'Open calendar',
+                visualDensity: VisualDensity.compact,
+                constraints:
+                    const BoxConstraints.tightFor(width: 32, height: 32),
+                padding: EdgeInsets.zero,
+                color: Colors.white,
+                iconSize: 17,
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const HomeCalendarScreen())),
+                icon: const Icon(Icons.calendar_today_outlined),
+              ),
             ])),
       ]);
 
@@ -699,29 +784,6 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             label: const Text('View All', style: TextStyle(fontSize: 11)),
             icon: const Icon(Icons.arrow_forward, size: 15),
             iconAlignment: IconAlignment.end),
-        SizedBox(
-            width: 28,
-            height: 28,
-            child: PopupMenuButton<String>(
-              tooltip: 'Task options',
-              iconSize: 18,
-              padding: EdgeInsets.zero,
-              onSelected: (value) {
-                if (value == 'field') {
-                  widget.onOpenCheckIn();
-                } else if (value == 'ec') {
-                  setState(() => _showEc = true);
-                } else {
-                  _showCreateMenu();
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                    value: 'create', child: Text('Create task or EC')),
-                PopupMenuItem(value: 'ec', child: Text('EC')),
-                PopupMenuItem(value: 'field', child: Text('Field actions'))
-              ],
-            )),
       ]);
 
   String _dueLabel(String value) {
@@ -813,7 +875,7 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
                     child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Tooltip(
                               message: task.rowAction == null
@@ -838,104 +900,31 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                                           },
                                   ))),
                           Expanded(
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                if (task.projectName != null &&
-                                    task.projectName!.isNotEmpty)
-                                  Text(task.projectName!,
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          color: OrbitColors.textSecondary,
-                                          fontWeight: FontWeight.w600)),
-                                InkWell(
-                                  onTap: () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                          builder: (_) => TaskDetailScreen(
-                                              taskId: task.id))),
-                                  child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 2),
-                                      child: Text(task.title,
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              height: 1.1,
-                                              fontWeight: FontWeight.w500,
-                                              color: OrbitColors.textNavy,
-                                              decoration: task.status ==
-                                                      'completed'
-                                                  ? TextDecoration.lineThrough
-                                                  : null))),
-                                ),
-                                Wrap(spacing: 10, runSpacing: 4, children: [
-                                  if (task.assignees.isNotEmpty)
-                                    Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.person_outline,
-                                              size: 13,
-                                              color: OrbitColors.textSecondary),
-                                          const SizedBox(width: 3),
-                                          Flexible(
-                                              child: Text(task.assignees.first,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                      fontSize: 10,
-                                                      color: OrbitColors
-                                                          .textSecondary))),
-                                        ]),
-                                  if (task.dueDate.isNotEmpty)
-                                    Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                              Icons.calendar_today_outlined,
-                                              size: 12,
-                                              color: OrbitColors.textSecondary),
-                                          const SizedBox(width: 4),
-                                          Flexible(
-                                              child: Text(
-                                                  _dueLabel(task.dueDate),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                      fontSize: 10,
-                                                      color: OrbitColors
-                                                          .textSecondary))),
-                                        ]),
-                                ]),
-                                Wrap(spacing: 4, runSpacing: 4, children: [
-                                  if (task.status == 'pending_review' ||
-                                      task.hasPendingReview)
-                                    const Chip(
-                                        label: Text('Pending review'),
-                                        visualDensity: VisualDensity.compact),
-                                ]),
-                              ])),
-                          const SizedBox(width: 6),
-                          Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                  color: task.priority.toLowerCase() == 'high'
-                                      ? OrbitColors.kpiRedBg
-                                      : OrbitColors.creamCard,
-                                  borderRadius: BorderRadius.circular(99)),
-                              child: Text(
-                                  task.priority.isEmpty
-                                      ? 'Medium'
-                                      : task.priority[0].toUpperCase() +
-                                          task.priority.substring(1),
+                            child: InkWell(
+                              onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          TaskDetailScreen(taskId: task.id))),
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 6),
+                                child: Text(
+                                  task.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color:
-                                          task.priority.toLowerCase() == 'high'
-                                              ? OrbitColors.kpiRed
-                                              : OrbitColors.brandOrange))),
+                                    fontSize: 13,
+                                    height: 1.25,
+                                    fontWeight: FontWeight.w500,
+                                    color: OrbitColors.textNavy,
+                                    decoration: task.status == 'completed'
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ]),
                   );
                 },

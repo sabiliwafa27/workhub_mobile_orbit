@@ -13,6 +13,10 @@ import '../../tasks/providers/ec_progress_provider.dart';
 import '../../home/providers/dashboard_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chat/screens/employee_chat_screen.dart';
+import '../../home/screens/global_search_screen.dart';
+import '../../../core/widgets/whatsapp_popup_menu.dart';
+import '../../../core/widgets/attachment_preview_tile.dart';
+import '../../../core/utils/created_date_format.dart';
 
 import 'ec_inbox_detail_screen.dart';
 import 'discussion_panel.dart';
@@ -162,12 +166,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     return OrbitWorkspaceScaffold(
       subtitle: 'Tasks, conversations & approvals',
       floatingActionButton: Padding(
-        padding: EdgeInsets.only(
-          bottom: 16 +
-              (MediaQuery.paddingOf(context).bottom -
-                      MediaQuery.viewPaddingOf(context).bottom)
-                  .clamp(0.0, double.infinity),
-        ),
+        padding: const EdgeInsets.only(bottom: 80),
         child: ExpandingActionFab(actions: [
           ExpandingFabAction(
               label: 'Create task',
@@ -207,9 +206,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            tooltip: 'Search inbox',
+            icon: const Icon(Icons.search_rounded, color: Colors.white),
             onPressed: () {
-              ref.read(inboxNotifierProvider.notifier).loadInbox();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const GlobalSearchScreen(scope: SearchScope.inbox),
+                ),
+              );
             },
           ),
         ],
@@ -226,70 +231,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    constraints: const BoxConstraints(minHeight: 46),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: OrbitColors.cardSurface,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: OrbitColors.cardBorder),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0A06244D),
-                          blurRadius: 10,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.search_rounded,
-                          color: OrbitColors.textMuted,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            onChanged: (value) {
-                              setState(() => _search = value.trim());
-                              _searchTimer?.cancel();
-                              _searchTimer = Timer(
-                                const Duration(milliseconds: 350),
-                                () {
-                                  if (mounted) {
-                                    ref
-                                        .read(inboxNotifierProvider.notifier)
-                                        .loadInbox(search: _search);
-                                  }
-                                },
-                              );
-                            },
-                            style: const TextStyle(
-                              color: OrbitColors.textPrimary,
-                              fontSize: 14,
-                            ),
-                            decoration: const InputDecoration(
-                              hintText: 'Search name, phone, plate...',
-                              hintStyle: TextStyle(
-                                color: OrbitColors.textMuted,
-                                fontSize: 14,
-                              ),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              filled: false,
-                              isDense: true,
-                              contentPadding:
-                                  EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -331,13 +272,16 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                           ),
                           const SizedBox(width: 8),
                         ],
-                        _buildFilterChip(
-                          key: ValueKey('source-$_selectedSource'),
-                          label:
-                              sources[_selectedSource] ?? _selectedSourceLabel,
-                          selected: _selectedSource != 'All',
-                          trailingIcon: Icons.keyboard_arrow_down_rounded,
-                          onTap: () => _showSourceFilterSheet(context, sources),
+                        Builder(
+                          builder: (chipContext) => _buildFilterChip(
+                            key: ValueKey('source-$_selectedSource'),
+                            label: sources[_selectedSource] ??
+                                _selectedSourceLabel,
+                            selected: _selectedSource != 'All',
+                            trailingIcon: Icons.keyboard_arrow_down_rounded,
+                            onTap: () =>
+                                _showSourceFilterSheet(chipContext, sources),
+                          ),
                         ),
                       ],
                     ),
@@ -482,78 +426,57 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   }
 
   Future<void> _showSourceFilterSheet(
-    BuildContext context,
+    BuildContext chipContext,
     Map<String, String> sources,
   ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: OrbitColors.cardSurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 10),
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: OrbitColors.cardBorder,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 14, 20, 8),
-              child: Text(
-                'Filter by source',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: OrbitColors.textNavy,
-                ),
-              ),
-            ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final source in sources.entries)
-                    ListTile(
-                      title: Text(
-                        source.value,
-                        style: TextStyle(
-                          fontWeight: _selectedSource == source.key
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: OrbitColors.textNavy,
-                        ),
-                      ),
-                      trailing: _selectedSource == source.key
-                          ? const Icon(
-                              Icons.check_rounded,
-                              color: OrbitColors.primaryNavy,
-                            )
-                          : null,
-                      onTap: () {
-                        setState(() {
-                          _selectedSource = source.key;
-                          _selectedSourceLabel = source.value;
-                        });
-                        Navigator.of(sheetContext).pop();
-                      },
-                    ),
-                ],
-              ),
-            ),
-          ],
+    final RenderBox? button = chipContext.findRenderObject() as RenderBox?;
+    final RenderBox? overlay =
+        Overlay.of(chipContext).context.findRenderObject() as RenderBox?;
+
+    final RelativeRect position;
+    if (button != null && overlay != null) {
+      position = RelativeRect.fromRect(
+        Rect.fromPoints(
+          button.localToGlobal(Offset(0, button.size.height + 4),
+              ancestor: overlay),
+          button.localToGlobal(button.size.bottomRight(Offset.zero),
+              ancestor: overlay),
         ),
-      ),
+        Offset.zero & overlay.size,
+      );
+    } else {
+      position = const RelativeRect.fromLTRB(16, 200, 16, 0);
+    }
+
+    final selectedKey = await showWhatsAppMenu<String>(
+      context: chipContext,
+      position: position,
+      transformAlignment: Alignment.topLeft,
+      minWidth: 190,
+      items: [
+        for (final source in sources.entries)
+          WhatsAppMenuItem<String>(
+            value: source.key,
+            title: source.value,
+            fontWeight: _selectedSource == source.key
+                ? FontWeight.w700
+                : FontWeight.w400,
+            textColor: _selectedSource == source.key
+                ? OrbitColors.primaryNavy
+                : const Color(0xFF111B21),
+            trailingIcon:
+                _selectedSource == source.key ? Icons.check_rounded : null,
+            iconColor: OrbitColors.primaryNavy,
+          ),
+      ],
     );
+
+    if (selectedKey != null && mounted) {
+      setState(() {
+        _selectedSource = selectedKey;
+        _selectedSourceLabel = sources[selectedKey] ?? _selectedSourceLabel;
+      });
+    }
   }
 
   Widget _buildFilterChip({
@@ -680,6 +603,19 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 .catchError((_) {});
           }
           final taskId = int.tryParse(item.subjectKey ?? '');
+          final ecEntryId = item.moduleCode == 'workhub_ec'
+              ? int.tryParse(item.commentSubjectKey ?? item.subjectKey ?? '')
+              : null;
+          if (ecEntryId != null) {
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => EcInboxDetailScreen(
+                entryId: ecEntryId.toString(),
+                title: item.title,
+                createdAt: item.createdAt,
+              ),
+            ));
+            return;
+          }
           final isTask = item.subjectType == 'task' ||
               const ['task', 'workhub', 'task-mine', 'task-assigned']
                   .contains(item.moduleCode);
@@ -829,11 +765,8 @@ class InboxItemDetailScreen extends ConsumerWidget {
             const ['task', 'workhub', 'task-mine', 'task-assigned']
                 .contains(item.moduleCode)) &&
         int.tryParse(item.subjectKey ?? '') != null;
-    final isEc = item.moduleCode == 'workhub_ec' &&
-        int.tryParse(item.commentSubjectKey ?? item.subjectKey ?? '') != null;
     final hasLinkedRecords = item.logisticInDetail != null ||
         item.logisticOutReference != null ||
-        isEc ||
         isTask;
     final canMarkRead = item.isUnread &&
         (item.readIdentity != null ||
@@ -849,8 +782,14 @@ class InboxItemDetailScreen extends ConsumerWidget {
         item.commentSubjectKey!.isNotEmpty;
 
     return OrbitWorkspaceScaffold(
-      subtitle: 'Record details & discussion',
-      appBar: AppBar(title: Text(item.sourceLabel)),
+      subtitle: formatCreatedDate(item.createdAt),
+      appBar: AppBar(
+        title: Text(
+          item.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
       body: OrbitDetailList(
         children: [
           // Header Hero Card
@@ -943,15 +882,6 @@ class InboxItemDetailScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            item.title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: OrbitColors.textNavy,
-                              height: 1.25,
-                            ),
-                          ),
                           if (item.subtitle != null &&
                               item.subtitle!.isNotEmpty) ...[
                             const SizedBox(height: 6),
@@ -969,31 +899,6 @@ class InboxItemDetailScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-                if (item.createdAt.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  const Divider(height: 1, color: OrbitColors.cardBorder),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.calendar_today_outlined,
-                        size: 15,
-                        color: OrbitColors.textMuted,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          item.createdAt,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            color: OrbitColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ],
             ),
           ),
@@ -1055,17 +960,6 @@ class InboxItemDetailScreen extends ConsumerWidget {
                   ),
                 )),
               ),
-            if (isEc)
-              _buildLinkedRecordTile(
-                icon: Icons.emoji_events_outlined,
-                title: 'EC contest details',
-                buttonLabel: 'Open EC details',
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => EcInboxDetailScreen(
-                    entryId: item.commentSubjectKey ?? item.subjectKey!,
-                  ),
-                )),
-              ),
             if (isTask)
               _buildLinkedRecordTile(
                 icon: Icons.task_alt_outlined,
@@ -1110,26 +1004,37 @@ class InboxItemDetailScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             for (final field in item.details.entries)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                title: Text(
-                  field.key,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: OrbitColors.textSecondary,
+              if (field.value.startsWith('http://') ||
+                  field.value.startsWith('https://') ||
+                  isImageFile(field.value))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: AttachmentPreviewTile(
+                    fileName: field.key,
+                    url: field.value,
+                  ),
+                )
+              else
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  title: Text(
+                    field.key,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: OrbitColors.textSecondary,
+                    ),
+                  ),
+                  subtitle: Text(
+                    field.value,
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: OrbitColors.textNavy,
+                    ),
                   ),
                 ),
-                subtitle: Text(
-                  field.value,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    color: OrbitColors.textNavy,
-                  ),
-                ),
-              ),
           ],
 
           // Actions Card
@@ -1181,12 +1086,13 @@ class InboxItemDetailScreen extends ConsumerWidget {
                     final identity = item.readIdentity;
                     var success = true;
                     if (identity != null) {
-                      success = await ref.read(inboxRepositoryProvider).markRead(
-                            identity.module,
-                            identity.routeKey,
-                            readSubjectType: identity.type,
-                            readSubjectKey: identity.key,
-                          );
+                      success =
+                          await ref.read(inboxRepositoryProvider).markRead(
+                                identity.module,
+                                identity.routeKey,
+                                readSubjectType: identity.type,
+                                readSubjectKey: identity.key,
+                              );
                     }
                     try {
                       await ref
@@ -1205,8 +1111,7 @@ class InboxItemDetailScreen extends ConsumerWidget {
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content:
-                              Text('Unable to mark this item as read.'),
+                          content: Text('Unable to mark this item as read.'),
                         ),
                       );
                     }

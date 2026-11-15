@@ -27,7 +27,7 @@ void main() {
     expect(find.text('Inbox'), findsOneWidget);
     expect(find.text('Tasks'), findsOneWidget);
     expect(find.text('Projects'), findsOneWidget);
-    expect(find.text('ERPa'), findsOneWidget);
+    expect(find.text('Mail'), findsOneWidget);
     expect(find.text('4'), findsOneWidget);
 
     final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));

@@ -178,9 +178,19 @@ class OrbitTheme {
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: OrbitColors.cardSurface,
+        color: Colors.white,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 6,
+        shadowColor: const Color(0x33000000),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        textStyle: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w400,
+          color: Color(0xFF111B21),
+          letterSpacing: 0.1,
+        ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: OrbitColors.cardSurface,

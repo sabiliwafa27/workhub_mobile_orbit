@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/realtime/reverb_service.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../../../core/widgets/workhub_navigation_bar.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../auth/screens/profile_screen.dart';
+import 'global_search_screen.dart';
 import '../../chat/screens/chat_list_screen.dart';
 import '../../inbox/providers/inbox_provider.dart';
 import '../../inbox/screens/inbox_screen.dart';
 import '../../projects/screens/projects_screen.dart';
 import '../../tasks/screens/task_screen.dart';
-import '../../erpa/screens/erpa_screen.dart';
+import '../../mail/screens/mail_screen.dart';
 import 'orbit_dashboard_view.dart';
 
 class OrbitMainShell extends ConsumerStatefulWidget {
@@ -31,6 +34,18 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
 
   void _onBottomNavTapped(int index) {
     setState(() => _currentIndex = index);
+  }
+
+  void _openGlobalSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const GlobalSearchScreen()),
+    );
+  }
+
+  void _openProfilePage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    );
   }
 
   void _showQuickActionSheet() {
@@ -142,17 +157,18 @@ class _OrbitMainShellState extends ConsumerState<OrbitMainShell> {
 
     final pages = [
       OrbitDashboardView(
-        onOpenSearch: () => setState(() => _currentIndex = 2),
+        onOpenSearch: _openGlobalSearch,
         onOpenNotifications: () => setState(() => _currentIndex = 1),
         onOpenTasks: () => setState(() => _currentIndex = 2),
         onOpenProjects: () => setState(() => _currentIndex = 3),
         onOpenErp: () => setState(() => _currentIndex = 4),
         onOpenCheckIn: _showQuickActionSheet,
+        onOpenProfile: _openProfilePage,
       ),
       const InboxScreen(),
       const TaskScreen(),
       const ProjectsScreen(),
-      const ErpaScreen(),
+      const MailScreen(),
     ];
 
     return Scaffold(

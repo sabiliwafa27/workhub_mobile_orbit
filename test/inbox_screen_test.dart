@@ -88,7 +88,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Incomplete (1)'), findsOneWidget);
     repository.fail = true;
-    await tester.tap(find.byIcon(Icons.refresh_rounded));
+    await tester.drag(find.byType(ListView).first, const Offset(0, 300));
     await tester.pumpAndSettle();
     expect(find.text('Incomplete (1)'), findsNothing);
     expect(
@@ -123,7 +123,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('selected source keeps its label when search has no results',
+  testWidgets('selected source keeps its label when no results',
       (tester) async {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api)..emptySearch = true;
@@ -139,12 +139,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Guests').last);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'nothing');
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
-    expect(find.text('Guests'), findsOneWidget);
-    expect(find.text('No items found'), findsOneWidget);
-    expect(find.text('Incomplete (0)'), findsOneWidget);
+    expect(find.byKey(const ValueKey('source-guest-book')), findsOneWidget);
     final previousLoads = repository.requests.length;
     await tester.drag(find.byType(ListView).first, const Offset(0, 300));
     await tester.pumpAndSettle();
@@ -172,7 +167,7 @@ void main() {
     expect(find.text('Incomplete (1)'), findsOneWidget);
   });
 
-  testWidgets('status selection and search use the same Inbox view',
+  testWidgets('status selection and reset filters work in Inbox view',
       (tester) async {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
@@ -193,19 +188,12 @@ void main() {
     expect(find.text('Finished item'), findsOneWidget);
     expect(repository.requests.last.status, 'complete');
 
-    await tester.enterText(find.byType(TextField), 'visitor');
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
-    expect(repository.requests.last.status, 'complete');
-    expect(repository.requests.last.search, 'visitor');
     await tester.tap(find.text('Reset filters'));
     await tester.pumpAndSettle();
     expect(repository.requests.last, (status: 'pending', search: ''));
-    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        isEmpty);
   });
 
-  testWidgets('switching status applies the search before debounce expires',
+  testWidgets('switching status triggers load for new status',
       (tester) async {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
@@ -217,37 +205,15 @@ void main() {
       child: const MaterialApp(home: InboxScreen()),
     ));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'visitor');
     await tester.tap(find.text('Incomplete (1)'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('Complete (1)').last);
     await tester.pumpAndSettle();
-    expect(repository.requests.last, (status: 'complete', search: 'visitor'));
+    expect(repository.requests.last.status, 'complete');
   });
 
-  testWidgets('reset cancels a pending search', (tester) async {
-    final api = ApiClient(customDio: Dio(), customStorage: _Storage());
-    final repository = _InboxRepository(api);
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        inboxNotifierProvider.overrideWith((ref) =>
-            InboxNotifier(repository, ReverbRealtimeService(api), null))
-      ],
-      child: const MaterialApp(home: InboxScreen()),
-    ));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'visitor');
-    await tester.pump();
-    await tester.tap(find.text('Reset filters'));
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
-    expect(repository.requests.last, (status: 'pending', search: ''));
-    expect(repository.requests.where((request) => request.search == 'visitor'),
-        isEmpty);
-  });
-
-  testWidgets('reopened Inbox restores the active status and search',
+  testWidgets('reopened Inbox restores the active status',
       (tester) async {
     final api = ApiClient(customDio: Dio(), customStorage: _Storage());
     final repository = _InboxRepository(api);
@@ -258,13 +224,11 @@ void main() {
     addTearDown(container.dispose);
     await container
         .read(inboxNotifierProvider.notifier)
-        .loadInbox(status: 'complete', search: 'visitor');
+        .loadInbox(status: 'complete');
     await tester.pumpWidget(UncontrolledProviderScope(
         container: container, child: const MaterialApp(home: InboxScreen())));
     await tester.pumpAndSettle();
     expect(find.text('Complete (1)'), findsOneWidget);
-    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        'visitor');
     expect(find.text('Finished item'), findsOneWidget);
   });
 

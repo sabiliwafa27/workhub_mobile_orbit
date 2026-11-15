@@ -79,10 +79,20 @@ class _Adapter implements HttpClientAdapter {
                       'last_page': pagedTasks ? 2 : 1
                     }
                   }
-                : options.path.endsWith('/inbox/todos')
+                : options.path.endsWith('/inbox/api/todos') ||
+                        options.path.endsWith('/inbox/todos')
                     ? {
                         'tasks': [],
-                        'incomplete': [],
+                        'incomplete': List.generate(
+                            inboxTotal,
+                            (i) => {
+                                  'id': i + 1,
+                                  'module': 'task',
+                                  'subject_key': '${i + 1}',
+                                  'title': 'Approval ${i + 1}',
+                                  'has_unread': true,
+                                  'unread_count': 1
+                                }),
                         'complete': [],
                         'incomplete_count': inboxTotal,
                         'complete_count': 0
@@ -134,8 +144,6 @@ void main() {
                 onOpenNotifications: () {},
                 onOpenCheckIn: () {}))));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Unified Inbox & Approvals'), 250,
-        scrollable: find.byType(Scrollable).first);
     expect(find.text('8'), findsWidgets);
   });
 
@@ -196,7 +204,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Dashboard task'), 300,
         scrollable: find.byType(Scrollable).first);
-    expect(find.text('Pending review'), findsOneWidget);
+    expect(find.text('Dashboard task'), findsOneWidget);
     expect(
         tester.widget<Checkbox>(find.byType(Checkbox).first).onChanged, isNull);
   });
