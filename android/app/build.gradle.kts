@@ -47,3 +47,9 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+}

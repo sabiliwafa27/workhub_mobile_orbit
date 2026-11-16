@@ -49,6 +49,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _submitPasskey() async {
+    final success = await ref
+        .read(authProvider.notifier)
+        .loginWithPasskey(rememberMe: _rememberMe);
+
+    if (!success && mounted) {
+      final error = ref.read(authProvider).errorMessage;
+      if (error != null && error.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: ErpColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -228,6 +246,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         style: TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w600),
                       ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: authState.isLoading ? null : _submitPasskey,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: ErpColors.primaryNavy,
+                  side: const BorderSide(color: OrbitColors.bubbleBlueBorder),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                icon: const Icon(Icons.key_rounded, size: 19),
+                label: const Text(
+                  'Sign in with Passkey',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),

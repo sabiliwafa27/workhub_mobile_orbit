@@ -51,6 +51,16 @@ final _taskAiSummaryProvider = FutureProvider.autoDispose
         : null;
   }
 
+  String statusFrom(Map<String, dynamic> data, String fallback) {
+    final raw = data['status'] ?? data['state'];
+    if (raw != null && raw.toString().trim().isNotEmpty) {
+      return raw.toString().trim().toLowerCase();
+    }
+    if (data['pending'] == true) return 'processing';
+    if (data['pending'] == false) return 'ready';
+    return fallback;
+  }
+
   final dispatchResponse = await api.post('/tasks/$id/ai-summary');
   final dispatchBody = dispatchResponse.data;
   final dispatchData = dispatchBody is Map && dispatchBody['data'] is Map
@@ -65,7 +75,7 @@ final _taskAiSummaryProvider = FutureProvider.autoDispose
   final generationId = generationValue?.toString();
   var statusData = dispatchData;
   var summary = summaryFrom(statusData);
-  var status = (statusData['status'] ?? 'processing').toString().toLowerCase();
+  var status = statusFrom(statusData, 'processing');
   if (summary != null) {
     return _TaskAiSummaryState(status: 'ready', summary: summary);
   }
@@ -74,7 +84,7 @@ final _taskAiSummaryProvider = FutureProvider.autoDispose
     await Future<void>.delayed(const Duration(seconds: 2));
     statusData = await readStatus(generationId);
     summary = summaryFrom(statusData);
-    status = (statusData['status'] ?? status).toString().toLowerCase();
+    status = statusFrom(statusData, status);
     if (summary != null) {
       return _TaskAiSummaryState(status: 'ready', summary: summary);
     }
@@ -180,8 +190,12 @@ class _TaskAiSummaryCard extends ConsumerWidget {
             ),
             data: (result) {
               if (result.summary == null) {
+                final isPending = result.status == 'processing' ||
+                    result.status == 'pending' ||
+                    result.status == 'queued' ||
+                    result.status == 'running';
                 return Text(
-                  result.status == 'processing' || result.status == 'pending'
+                  isPending
                       ? 'Jarvis is still preparing the summary.'
                       : 'No Jarvis summary is available for this task yet.',
                   style: const TextStyle(

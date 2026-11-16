@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../models/user_model.dart';
+import '../services/passkey_service.dart';
 
 final storageServiceProvider = Provider<SecureStorageService>((ref) {
   return SecureStorageService();
@@ -11,6 +12,11 @@ final storageServiceProvider = Provider<SecureStorageService>((ref) {
 final apiClientProvider = Provider<ApiClient>((ref) {
   final storage = ref.watch(storageServiceProvider);
   return ApiClient(customStorage: storage);
+});
+
+final passkeyServiceProvider = Provider<PasskeyService>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return PasskeyService(apiClient);
 });
 
 class AuthState {
@@ -44,8 +50,14 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _apiClient;
   final SecureStorageService _storage;
+  final PasskeyService _passkeyService;
 
-  AuthNotifier(this._apiClient, this._storage) : super(AuthState()) {
+  AuthNotifier(
+    this._apiClient,
+    this._storage, [
+    PasskeyService? passkeyService,
+  ])  : _passkeyService = passkeyService ?? PasskeyService(_apiClient),
+        super(AuthState()) {
     checkAuthStatus();
   }
 
@@ -104,6 +116,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> loginWithPasskey({bool rememberMe = true}) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final result = await _passkeyService.loginWithPasskey(
+        rememberMe: rememberMe,
+      );
+      await _storage.saveToken(result.token);
+      state = state.copyWith(
+        isLoading: false,
+        isAuthenticated: true,
+        user: result.user,
+      );
+      return true;
+    } on PasskeyCancelledException {
+      state = state.copyWith(isLoading: false, errorMessage: null);
+      return false;
+    } on PasskeyException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<PasskeyCredentialModel> registerPasskey({required String name}) async {
+    final created = await _passkeyService.registerPasskey(name: name);
+    await checkAuthStatus();
+    return created;
+  }
+
+  Future<void> deletePasskey(int passkeyId) async {
+    await _passkeyService.deletePasskey(passkeyId);
+    await checkAuthStatus();
+  }
+
   Future<void> logout() async {
     try {
       await _apiClient.dio.post('/auth/logout');
@@ -116,5 +164,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   final storage = ref.watch(storageServiceProvider);
-  return AuthNotifier(apiClient, storage);
+  final passkeyService = ref.watch(passkeyServiceProvider);
+  return AuthNotifier(apiClient, storage, passkeyService);
 });

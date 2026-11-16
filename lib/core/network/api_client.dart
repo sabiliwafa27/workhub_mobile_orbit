@@ -44,11 +44,6 @@ class ApiClient {
                   .replaceFirst('/inbox/api', '')
                   .replaceFirst('/inbox', '');
               path = '/api/v1/inbox$clean';
-            } else if (RegExp(r'^/tasks/\d+/ai-summary(?:/status)?$')
-                .hasMatch(path)) {
-              // AI summary routes are registered under the WorkHub web prefix,
-              // alongside /tasks/my and /tasks/assigned.
-              path = '/workhub$path';
             } else if (path.startsWith('/tasks/my') ||
                 path.startsWith('/tasks/assigned') ||
                 path.startsWith('/tasks/projects') ||

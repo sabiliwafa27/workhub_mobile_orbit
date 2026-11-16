@@ -3,13 +3,163 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
+import '../services/passkey_service.dart';
 
-class ProfileScreen extends ConsumerWidget {
+final _userPasskeysProvider =
+    FutureProvider.autoDispose<List<PasskeyCredentialModel>>((ref) async {
+  final user = ref.watch(authProvider).user;
+  try {
+    return await ref.watch(passkeyServiceProvider).fetchPasskeys();
+  } catch (_) {
+    return user?.passkeys ?? const [];
+  }
+});
+
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _passkeyBusy = false;
+
+  Future<void> _promptAndRegisterPasskey() async {
+    if (_passkeyBusy) return;
+    var draftName = 'WorkHub Android Phone';
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Register Passkey'),
+        content: TextFormField(
+          initialValue: draftName,
+          autofocus: true,
+          onChanged: (value) => draftName = value,
+          decoration: const InputDecoration(
+            labelText: 'Device / Passkey Name',
+            hintText: 'e.g. My Work Phone',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, draftName.trim()),
+            style: FilledButton.styleFrom(
+              backgroundColor: OrbitColors.primaryNavy,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || !mounted) return;
+
+    setState(() => _passkeyBusy = true);
+    try {
+      await ref.read(authProvider.notifier).registerPasskey(
+            name: name.isEmpty ? 'WorkHub Android Phone' : name,
+          );
+      ref.invalidate(_userPasskeysProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Passkey registered successfully.'),
+            backgroundColor: OrbitColors.kpiGreen,
+          ),
+        );
+      }
+    } on PasskeyCancelledException {
+      // User dismissed prompt; no error message needed.
+    } on PasskeyException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: OrbitColors.kpiRed,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: OrbitColors.kpiRed,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _passkeyBusy = false);
+    }
+  }
+
+  Future<void> _confirmAndDeletePasskey(PasskeyCredentialModel passkey) async {
+    if (_passkeyBusy) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Passkey'),
+        content: Text('Remove "${passkey.name}" from your Orbit account?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: OrbitColors.kpiRed),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _passkeyBusy = true);
+    try {
+      await ref.read(authProvider.notifier).deletePasskey(passkey.id);
+      ref.invalidate(_userPasskeysProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Passkey removed.'),
+            backgroundColor: OrbitColors.primaryNavy,
+          ),
+        );
+      }
+    } on PasskeyException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: OrbitColors.kpiRed,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: OrbitColors.kpiRed,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _passkeyBusy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
+    final passkeysAsync = ref.watch(_userPasskeysProvider);
+    final passkeys = passkeysAsync.valueOrNull ?? user?.passkeys ?? const [];
     final photo = user?.profilePhotoUrl;
 
     return Scaffold(
@@ -141,6 +291,153 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
 
+                  const SizedBox(height: 20),
+
+                  // Security & Passkeys Section
+                  const _SectionHeader(title: 'Security & Passkeys'),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: OrbitColors.cardBorder),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: OrbitColors.bubbleBlue
+                                    .withValues(alpha: .5),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.key_rounded,
+                                size: 18,
+                                color: OrbitColors.primaryNavy,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Passkeys',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: OrbitColors.textNavy,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Sign in faster with device biometrics or screen lock.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: OrbitColors.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: _passkeyBusy
+                                  ? null
+                                  : _promptAndRegisterPasskey,
+                              icon: _passkeyBusy
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.add_rounded, size: 18),
+                              label: const Text('Add'),
+                            ),
+                          ],
+                        ),
+                        if (passkeys.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          const _Divider(),
+                          for (var i = 0; i < passkeys.length; i++) ...[
+                            if (i > 0) const _Divider(),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.fingerprint_rounded,
+                                    size: 20,
+                                    color: OrbitColors.primaryNavy,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          passkeys[i].name,
+                                          style: const TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: OrbitColors.textNavy,
+                                          ),
+                                        ),
+                                        if (passkeys[i].createdAt != null &&
+                                            passkeys[i]
+                                                .createdAt!
+                                                .isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Added ${passkeys[i].createdAt!.split('T').first}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: OrbitColors.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Remove passkey',
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                      size: 20,
+                                      color: OrbitColors.kpiRed,
+                                    ),
+                                    onPressed: _passkeyBusy
+                                        ? null
+                                        : () => _confirmAndDeletePasskey(
+                                              passkeys[i],
+                                            ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ] else ...[
+                          const SizedBox(height: 10),
+                          const Text(
+                            'No passkeys registered yet.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: OrbitColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
                   // Additional Employee Fields from raw JSON if present
                   if (_buildExtraEmployeeFields(user.rawJson).isNotEmpty) ...[
                     const SizedBox(height: 20),
@@ -181,6 +478,7 @@ class ProfileScreen extends ConsumerWidget {
   static const _ignoredKeys = {
     'id',
     'name',
+    'preferred_name',
     'email',
     'employee_id',
     'employee_uuid',
@@ -195,6 +493,7 @@ class ProfileScreen extends ConsumerWidget {
     'orbit',
     'permissions',
     'modules',
+    'passkeys',
     'token',
     'device_name',
     'remember_me',

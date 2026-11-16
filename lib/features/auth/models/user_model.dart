@@ -1,3 +1,26 @@
+class PasskeyCredentialModel {
+  final int id;
+  final String name;
+  final String? createdAt;
+  final String? lastUsedAt;
+
+  const PasskeyCredentialModel({
+    required this.id,
+    required this.name,
+    this.createdAt,
+    this.lastUsedAt,
+  });
+
+  factory PasskeyCredentialModel.fromJson(Map<String, dynamic> json) {
+    return PasskeyCredentialModel(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      name: (json['name'] ?? 'Passkey').toString(),
+      createdAt: json['created_at']?.toString(),
+      lastUsedAt: json['last_used_at']?.toString(),
+    );
+  }
+}
+
 class UserModel {
   final int id;
   final String name;
@@ -12,6 +35,7 @@ class UserModel {
   final String? department;
   final List<String> permissions;
   final Map<String, dynamic> modules;
+  final List<PasskeyCredentialModel> passkeys;
   final Map<String, dynamic>? rawJson;
 
   UserModel({
@@ -28,6 +52,7 @@ class UserModel {
     this.department,
     required this.permissions,
     required this.modules,
+    this.passkeys = const [],
     this.rawJson,
   });
 
@@ -50,6 +75,15 @@ class UserModel {
       }
     }
 
+    List<PasskeyCredentialModel> passkeys = [];
+    if (json['passkeys'] is List) {
+      passkeys = (json['passkeys'] as List)
+          .whereType<Map>()
+          .map((e) =>
+              PasskeyCredentialModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+
     final emailStr = json['email'] as String? ?? '';
     final defaultUsername =
         emailStr.contains('@') ? emailStr.split('@').first : null;
@@ -70,6 +104,7 @@ class UserModel {
       department: json['department'] as String? ?? json['division'] as String?,
       permissions: perms,
       modules: mods,
+      passkeys: passkeys,
       rawJson: json,
     );
   }
