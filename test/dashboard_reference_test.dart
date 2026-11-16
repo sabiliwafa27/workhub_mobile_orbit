@@ -325,4 +325,24 @@ void main() {
         8);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('dashboard header overflow menu shows updates, profile, and logout',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(referenceApp(ReferenceAdapter()));
+    await tester.pumpAndSettle();
+
+    final moreButton = find.byTooltip('More options');
+    expect(moreButton, findsOneWidget);
+    expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
+
+    await tester.tap(moreButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Check for Updates'), findsOneWidget);
+    expect(find.text('My Profile'), findsOneWidget);
+    expect(find.text('Logout'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../../../core/theme/orbit_motion.dart';
+import '../../../core/updater/app_updater_service.dart';
+import '../../../core/updater/update_dialog.dart';
 import '../providers/dashboard_provider.dart';
 import 'orbit_dashboard_components.dart';
 import 'home_calendar_screen.dart';
@@ -428,6 +430,56 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
     }
   }
 
+  Future<void> _checkForUpdates() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Checking for updates...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+    final updater = AppUpdaterService();
+    final shorebird = await updater.checkForShorebirdUpdate();
+    if (!mounted) return;
+    if (shorebird != ShorebirdUpdateResult.unavailable) {
+      final message = switch (shorebird) {
+        ShorebirdUpdateResult.upToDate => 'You are using the latest version.',
+        ShorebirdUpdateResult.downloaded =>
+          'Update downloaded. Close and reopen WorkHub to use it.',
+        ShorebirdUpdateResult.restartRequired =>
+          'An update is ready. Close and reopen WorkHub to apply it.',
+        ShorebirdUpdateResult.failed =>
+          'Unable to check or download the update. Please try again.',
+        ShorebirdUpdateResult.unavailable => '',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: shorebird == ShorebirdUpdateResult.failed
+              ? null
+              : OrbitColors.kpiGreen,
+        ),
+      );
+      return;
+    }
+
+    final release = await updater.checkForUpdate();
+    if (!mounted) return;
+    if (release != null && release.hasUpdate) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => UpdateDialog(releaseInfo: release),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You are using the latest version.'),
+          backgroundColor: OrbitColors.kpiGreen,
+        ),
+      );
+    }
+  }
+
   Widget _buildReferenceHeader(String? name) {
     final hour = DateTime.now().hour;
     final greeting = hour < 11
@@ -437,7 +489,6 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             : hour < 18
                 ? 'Good Evening'
                 : 'Good Night';
-    final photo = ref.watch(authProvider).user?.profilePhotoUrl;
     Widget action(IconData icon, String label, VoidCallback onTap,
             {bool badge = false}) =>
         IconButton(
@@ -487,112 +538,87 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                     color: Colors.white))),
         action(Icons.search_rounded, 'Search workspace', widget.onOpenSearch),
         Builder(
-          builder: (avatarContext) {
-            return GestureDetector(
-              onTap: () async {
-                final RenderBox button =
-                    avatarContext.findRenderObject()! as RenderBox;
-                final RenderBox overlay = Overlay.of(avatarContext)
-                    .context
-                    .findRenderObject()! as RenderBox;
-                final RelativeRect position = RelativeRect.fromRect(
-                  Rect.fromPoints(
-                    button.localToGlobal(Offset(0, button.size.height + 4),
-                        ancestor: overlay),
-                    button.localToGlobal(button.size.bottomRight(Offset.zero),
-                        ancestor: overlay),
-                  ),
-                  Offset.zero & overlay.size,
-                );
-
-                final value = await showWhatsAppMenu<String>(
-                  context: avatarContext,
-                  position: position,
-                  items: const [
-                    WhatsAppMenuItem(
-                      value: 'profile',
-                      title: 'My Profile',
-                      icon: Icons.person_outline_rounded,
-                      iconColor: Color(0xFF54656F),
-                      textColor: Color(0xFF111B21),
-                    ),
-                    WhatsAppMenuItem(
-                      value: 'logout',
-                      title: 'Logout',
-                      icon: Icons.logout_rounded,
-                      iconColor: Color(0xFFEA0038),
-                      textColor: Color(0xFFEA0038),
-                    ),
-                  ],
-                );
-
-                if (!mounted || value == null) return;
-                if (value == 'profile') {
-                  if (widget.onOpenProfile != null) {
-                    widget.onOpenProfile!();
-                  } else {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                    );
-                  }
-                } else if (value == 'logout') {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (dCtx) => AlertDialog(
-                      title: const Text('Sign Out'),
-                      content: const Text(
-                          'Are you sure you want to sign out from WorkHub?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(dCtx, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(dCtx, true),
-                          style:
-                              TextButton.styleFrom(foregroundColor: Colors.red),
-                          child: const Text('Sign Out'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    await ref.read(authProvider.notifier).logout();
-                  }
-                }
-              },
-              child: Padding(
-                padding: const EdgeInsets.only(left: 6),
-                child: CircleAvatar(
-                  radius: 19,
-                  backgroundColor: Colors.white,
-                  child: ClipOval(
-                    child: photo == null || photo.isEmpty
-                        ? Text(
-                            name?.isNotEmpty == true
-                                ? name![0].toUpperCase()
-                                : 'U',
-                            style: const TextStyle(
-                              color: OrbitColors.primaryNavy,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          )
-                        : Image.network(
-                            photo,
-                            width: 36,
-                            height: 36,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.person_outline,
-                              color: OrbitColors.primaryNavy,
-                              size: 22,
-                            ),
-                          ),
-                  ),
+          builder: (menuContext) {
+            return action(Icons.more_vert_rounded, 'More options', () async {
+              final RenderBox button =
+                  menuContext.findRenderObject()! as RenderBox;
+              final RenderBox overlay = Overlay.of(menuContext)
+                  .context
+                  .findRenderObject()! as RenderBox;
+              final RelativeRect position = RelativeRect.fromRect(
+                Rect.fromPoints(
+                  button.localToGlobal(Offset(0, button.size.height + 4),
+                      ancestor: overlay),
+                  button.localToGlobal(button.size.bottomRight(Offset.zero),
+                      ancestor: overlay),
                 ),
-              ),
-            );
+                Offset.zero & overlay.size,
+              );
+
+              final value = await showWhatsAppMenu<String>(
+                context: menuContext,
+                position: position,
+                items: const [
+                  WhatsAppMenuItem(
+                    value: 'updates',
+                    title: 'Check for Updates',
+                    icon: Icons.system_update_rounded,
+                    iconColor: Color(0xFF54656F),
+                    textColor: Color(0xFF111B21),
+                  ),
+                  WhatsAppMenuItem(
+                    value: 'profile',
+                    title: 'My Profile',
+                    icon: Icons.person_outline_rounded,
+                    iconColor: Color(0xFF54656F),
+                    textColor: Color(0xFF111B21),
+                  ),
+                  WhatsAppMenuItem(
+                    value: 'logout',
+                    title: 'Logout',
+                    icon: Icons.logout_rounded,
+                    iconColor: Color(0xFFEA0038),
+                    textColor: Color(0xFFEA0038),
+                  ),
+                ],
+              );
+
+              if (!mounted || value == null) return;
+              if (value == 'updates') {
+                await _checkForUpdates();
+              } else if (value == 'profile') {
+                if (widget.onOpenProfile != null) {
+                  widget.onOpenProfile!();
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  );
+                }
+              } else if (value == 'logout') {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (dCtx) => AlertDialog(
+                    title: const Text('Sign Out'),
+                    content: const Text(
+                        'Are you sure you want to sign out from WorkHub?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dCtx, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(dCtx, true),
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        child: const Text('Sign Out'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  await ref.read(authProvider.notifier).logout();
+                }
+              }
+            });
           },
         ),
       ]),

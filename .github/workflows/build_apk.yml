@@ -124,9 +124,12 @@ jobs:
           SHOREBIRD_APP_ID: ${{ secrets.SHOREBIRD_APP_ID }}
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
+          if [ -z "$SHOREBIRD_APP_ID" ] && [ -f shorebird.yaml ]; then
+            SHOREBIRD_APP_ID="$(sed -nE 's/^[[:space:]]*app_id:[[:space:]]*([^[:space:]#]+).*/\1/p' shorebird.yaml | head -n1 | tr -d "\"'")"
+          fi
           if [ -z "$SHOREBIRD_APP_ID" ] || [ -z "$SHOREBIRD_TOKEN" ]; then
             if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-              echo 'Manual Shorebird release or patch requires SHOREBIRD_APP_ID and SHOREBIRD_TOKEN repository secrets.' >&2
+              echo 'Manual Shorebird release or patch requires SHOREBIRD_APP_ID (or shorebird.yaml app_id) and SHOREBIRD_TOKEN repository secrets.' >&2
               exit 1
             fi
             echo 'enabled=false' >> "$GITHUB_OUTPUT"
@@ -134,9 +137,19 @@ jobs:
             exit 0
           fi
           echo 'enabled=true' >> "$GITHUB_OUTPUT"
-          printf 'app_id: %s\n' "$SHOREBIRD_APP_ID" > shorebird.yaml
-          if ! rg -q '^  assets:' pubspec.yaml; then
-            sed -i '/^  uses-material-design: true$/a\  assets:\n    - shorebird.yaml' pubspec.yaml
+          if [ -f shorebird.yaml ] && grep -Eq '^[[:space:]]*app_id:' shorebird.yaml; then
+            sed -i -E "s|^([[:space:]]*app_id:).*|\1 $SHOREBIRD_APP_ID|" shorebird.yaml
+          elif [ -f shorebird.yaml ]; then
+            printf '\napp_id: %s\n' "$SHOREBIRD_APP_ID" >> shorebird.yaml
+          else
+            printf 'app_id: %s\n' "$SHOREBIRD_APP_ID" > shorebird.yaml
+          fi
+          if ! rg -q '^[[:space:]]*-[[:space:]]*shorebird\.yaml([[:space:]]|$)' pubspec.yaml; then
+            if rg -q '^  assets:' pubspec.yaml; then
+              sed -i '/^  assets:/a\    - shorebird.yaml' pubspec.yaml
+            else
+              sed -i '/^  uses-material-design: true$/a\  assets:\n    - shorebird.yaml' pubspec.yaml
+            fi
           fi
           flutter pub get
 
