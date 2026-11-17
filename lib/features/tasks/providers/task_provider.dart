@@ -501,6 +501,7 @@ class TaskNotifier extends StateNotifier<TaskListState> {
   String _priority = '';
   String? _from;
   String? _to;
+  bool _hasLoaded = false;
 
   TaskNotifier(this._repo, this._reverb, this._userId)
       : super(TaskListState()) {
@@ -517,7 +518,8 @@ class TaskNotifier extends StateNotifier<TaskListState> {
       String? priority,
       String? from,
       String? to,
-      bool clearDateRange = false}) async {
+      bool clearDateRange = false,
+      bool showLoading = true}) async {
     _scope = scope ?? _scope;
     _status = status ?? _status;
     _search = search ?? _search;
@@ -525,8 +527,10 @@ class TaskNotifier extends StateNotifier<TaskListState> {
     _from = clearDateRange ? null : from ?? _from;
     _to = clearDateRange ? null : to ?? _to;
     final generation = ++_generation;
-    state = state.copyWith(
-        isLoading: true, isLoadingMore: false, error: null, scope: _scope);
+    if (showLoading && !_hasLoaded) {
+      state = state.copyWith(
+          isLoading: true, isLoadingMore: false, error: null, scope: _scope);
+    }
     try {
       final page = await _repo.fetchTasks(
           scope: _scope,
@@ -536,6 +540,7 @@ class TaskNotifier extends StateNotifier<TaskListState> {
           from: _from,
           to: _to);
       if (!mounted || generation != _generation) return;
+      _hasLoaded = true;
       state = state.copyWith(
           tasks: page.tasks,
           page: page.page,
@@ -545,6 +550,7 @@ class TaskNotifier extends StateNotifier<TaskListState> {
           scope: _scope);
     } catch (e) {
       if (!mounted || generation != _generation) return;
+      _hasLoaded = true;
       state =
           state.copyWith(isLoading: false, error: e.toString(), scope: _scope);
     }
@@ -588,13 +594,16 @@ class TaskNotifier extends StateNotifier<TaskListState> {
 
   void _setupRealtime() {
     if (_userId != null) {
+      _reverb.subscribe('private-inbox.user.$_userId', (eventData) {
+        loadTasks(showLoading: false);
+      });
       _reverb.subscribe('private-App.Models.User.$_userId', (eventData) {
-        loadTasks();
+        loadTasks(showLoading: false);
       });
     }
 
     _reverb.subscribe('task-updates', (eventData) {
-      loadTasks();
+      loadTasks(showLoading: false);
     });
   }
 }

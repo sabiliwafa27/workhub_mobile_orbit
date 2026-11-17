@@ -1,7 +1,7 @@
 name: workhub_mobile
 description: "WorkHub / Orbit Mobile Client for Android and iOS"
 publish_to: "none"
-version: 1.0.46+46
+version: 1.0.48+48
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -41,6 +41,10 @@ dependencies:
   web_socket_channel: ^3.0.1
   shorebird_code_push: ^2.0.7
   webview_flutter: ^4.10.0
+  firebase_core: ^5.1.0
+  firebase_messaging: ^17.0.1
+  flutter_local_notifications: ^19.5.0
+  flutter_app_badger: ^1.5.0
 
 dev_dependencies:
   flutter_test:

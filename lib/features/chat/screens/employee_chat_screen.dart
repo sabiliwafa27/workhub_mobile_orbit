@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/realtime/reverb_service.dart';
 import '../../../core/theme/orbit_theme.dart';
 import '../../../core/widgets/expanding_action_fab.dart';
 import '../../../core/widgets/orbit_workspace.dart';
@@ -19,17 +20,35 @@ class _EmployeeChatScreenState extends ConsumerState<EmployeeChatScreen> {
   bool loading = true, unread = false;
   String? error;
   Timer? timer;
+  final List<void Function()> _unsubscribeRealtime = [];
 
   @override
   void initState() {
     super.initState();
     load();
     timer = Timer.periodic(const Duration(seconds: 20), (_) => load());
+    final userId = ref.read(authProvider).user?.id;
+    final reverb = ref.read(reverbServiceProvider);
+    if (userId != null) {
+      _unsubscribeRealtime.add(
+        reverb.subscribe('private-inbox.user.$userId', (_) {
+          unawaited(load());
+        }),
+      );
+    }
+    _unsubscribeRealtime.add(
+      reverb.subscribe('chat-updates', (_) {
+        unawaited(load());
+      }),
+    );
   }
 
   @override
   void dispose() {
     timer?.cancel();
+    for (final unsubscribe in _unsubscribeRealtime) {
+      unsubscribe();
+    }
     search.dispose();
     super.dispose();
   }
@@ -50,7 +69,7 @@ class _EmployeeChatScreenState extends ConsumerState<EmployeeChatScreen> {
     } catch (_) {
       if (mounted)
         setState(() {
-          error = 'Unable to load chats.';
+          if (chats.isEmpty) error = 'Unable to load chats.';
           loading = false;
         });
     }
@@ -290,7 +309,11 @@ class _EmployeeMessagesScreenState
     super.initState();
     messages = load();
     timer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) setState(() => messages = load());
+      if (mounted) {
+        setState(() {
+          messages = load();
+        });
+      }
     });
   }
 
@@ -322,7 +345,11 @@ class _EmployeeMessagesScreenState
           '/employee-chat/conversations/${widget.id}/messages',
           data: {'body': body});
       message.clear();
-      if (mounted) setState(() => messages = load());
+      if (mounted) {
+        setState(() {
+          messages = load();
+        });
+      }
     } catch (_) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
@@ -343,7 +370,9 @@ class _EmployeeMessagesScreenState
                   if (snapshot.hasError)
                     return Center(
                         child: TextButton(
-                            onPressed: () => setState(() => messages = load()),
+                            onPressed: () => setState(() {
+                              messages = load();
+                            }),
                             child: const Text(
                                 'Unable to load messages. Tap to retry.')));
                   if (!snapshot.hasData)

@@ -67,7 +67,7 @@ void main() {
     expect(result.incompleteUnreadCount, 1);
     expect(result.completeUnreadCount, 0);
     expect(result.sources['task-mine'], 'Assigned to Me');
-    expect(result.sources['task-assigned'], 'Assigned by Me');
+    expect(result.sources['task-assigned'], 'Assign to Others');
     expect(result.sourceCounts['task-mine'], [1, 0, 1, 0]);
     expect(result.sourceCounts['task-assigned'], [0, 1, 0, 0]);
     expect(adapter.request!.uri.path, '/api/v1/inbox/todos');

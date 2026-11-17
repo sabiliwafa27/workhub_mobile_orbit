@@ -70,19 +70,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final bgAsync = ref.watch(loginBackgroundProvider);
+    final bgModel = bgAsync.valueOrNull;
 
     return Scaffold(
       backgroundColor: OrbitColors.scaffoldBackground,
-      body: OrbitBackdrop(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-              child: OrbitEntrance(child: _buildLoginCard(authState)),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const OrbitBackdrop(child: SizedBox.expand()),
+          if (bgModel != null && bgModel.webpUrl.isNotEmpty)
+            Positioned.fill(
+              child: Image.network(
+                bgModel.webpUrl,
+                key: ValueKey('login-bg-${bgModel.webpUrl}'),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) {
+                  final fallbackJpg = bgModel.jpgUrl;
+                  if (fallbackJpg != null && fallbackJpg.isNotEmpty) {
+                    return Image.network(
+                      fallbackJpg,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    OrbitColors.primaryNavyDark.withValues(alpha: 0.28),
+                    OrbitColors.primaryNavyDark.withValues(alpha: 0.45),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0, vertical: 32.0),
+                child: OrbitEntrance(child: _buildLoginCard(authState)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

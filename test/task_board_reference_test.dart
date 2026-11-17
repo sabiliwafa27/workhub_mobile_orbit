@@ -73,6 +73,9 @@ void main() {
     final adapter = TaskReferenceAdapter();
     await tester.pumpWidget(workspaceApp(const TaskScreen(), adapter: adapter));
     await tester.pumpAndSettle();
+    expect(adapter.queries.last.containsKey('from'), isFalse);
+    await tester.tap(find.text('Today'));
+    await tester.pumpAndSettle();
     final today = DateTime.now().toIso8601String().split('T').first;
     expect(adapter.queries.last['from'], today);
     await tester.tap(find.text('Overdue'));
@@ -111,7 +114,7 @@ void main() {
     await tester.pumpWidget(workspaceApp(const TaskScreen(),
         adapter: TaskReferenceAdapter()..awaitingReview = true));
     await tester.pumpAndSettle();
-    expect(find.text('Active Tasks (5)'), findsOneWidget);
+    expect(find.text('Tasks (5)'), findsOneWidget);
     final box = tester.widget<Checkbox>(find.byType(Checkbox).first);
     expect(box.value, isFalse);
     expect(box.onChanged, isNull);
@@ -126,7 +129,7 @@ void main() {
     await tester.pumpWidget(workspaceApp(const TaskScreen(),
         adapter: TaskReferenceAdapter(), scale: 1.4));
     await tester.pumpAndSettle();
-    expect(find.text('Active Tasks (5)'), findsOneWidget);
+    expect(find.text('Tasks (5)'), findsOneWidget);
     expect(find.text('Perbaikan Error Modul Logistic Out Pada Halaman Purchase Orders Dan Comments'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

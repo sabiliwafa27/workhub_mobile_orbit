@@ -80,7 +80,7 @@ class InboxItemModel {
         'fleet-compliance' => 'Fleet Compliance',
         'workhub' => 'WorkHub',
         'task-mine' => 'Assigned to Me',
-        'task-assigned' => 'Assigned by Me',
+        'task-assigned' => 'Assign to Others',
         'workhub_ec' => 'EC',
         _ => sourceLabel == 'Task' ? filterSource : sourceLabel,
       };

@@ -53,8 +53,13 @@ final _logisticInMentionCapability =
 class InboxScreen extends ConsumerStatefulWidget {
   final bool isActive;
   final String initialSource;
-  const InboxScreen(
-      {super.key, this.isActive = true, this.initialSource = 'All'});
+  final bool showFloatingActionButton;
+  const InboxScreen({
+    super.key,
+    this.isActive = true,
+    this.initialSource = 'All',
+    this.showFloatingActionButton = true,
+  });
 
   @override
   ConsumerState<InboxScreen> createState() => _InboxScreenState();
@@ -165,23 +170,26 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
 
     return OrbitWorkspaceScaffold(
       subtitle: 'Tasks, conversations & approvals',
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80),
-        child: ExpandingActionFab(actions: [
-          ExpandingFabAction(
-              label: 'Create task',
-              icon: Icons.add_task_rounded,
-              onPressed: () => _createWorkItem(context, isEc: false)),
-          ExpandingFabAction(
-              label: 'Create EC',
-              icon: Icons.description_outlined,
-              onPressed: () => _createWorkItem(context, isEc: true)),
-          ExpandingFabAction(
-              label: 'New chat / DM',
-              icon: Icons.chat_bubble_outline_rounded,
-              onPressed: () => _startChat(context)),
-        ]),
-      ),
+      floatingActionButton: !widget.showFloatingActionButton
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(
+                  bottom: orbitResponsiveFabBottomOffset(context)),
+              child: ExpandingActionFab(actions: [
+                ExpandingFabAction(
+                    label: 'Create task',
+                    icon: Icons.add_task_rounded,
+                    onPressed: () => _createWorkItem(context, isEc: false)),
+                ExpandingFabAction(
+                    label: 'Create EC',
+                    icon: Icons.description_outlined,
+                    onPressed: () => _createWorkItem(context, isEc: true)),
+                ExpandingFabAction(
+                    label: 'New chat / DM',
+                    icon: Icons.chat_bubble_outline_rounded,
+                    onPressed: () => _startChat(context)),
+              ]),
+            ),
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         leadingWidth: 64,
@@ -372,8 +380,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                               : ListView.separated(
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
-                                  padding:
-                                      const EdgeInsets.fromLTRB(12, 6, 12, 96),
+                                  padding: EdgeInsets.fromLTRB(
+                                      12,
+                                      6,
+                                      12,
+                                      orbitResponsiveListBottomPadding(
+                                          context)),
                                   itemCount: filteredItems.length,
                                   separatorBuilder: (_, __) => const ColoredBox(
                                     color: OrbitColors.cardSurface,
@@ -670,7 +682,9 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                         ),
                       ),
                     Text(
-                      item.title,
+                      item.title.contains(':')
+                          ? item.title.split(':').first.trim()
+                          : item.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

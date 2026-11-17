@@ -12,10 +12,11 @@ import 'discussion_panel.dart';
 
 final _ecDetailProvider =
     FutureProvider.family<Map<String, dynamic>, String>((ref, id) async {
+  final cleanId = id.replaceFirst(RegExp(r'^ec:'), '');
   final response = await ref
       .watch(apiClientProvider)
       .dio
-      .get('/inbox/api/workhub-tasks/ec/$id/detail');
+      .get('/inbox/api/workhub-tasks/ec/$cleanId/detail');
   if (response.data is! Map)
     throw const FormatException('Unexpected EC detail response');
   return Map<String, dynamic>.from(response.data as Map);
@@ -44,6 +45,39 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
   String? error;
   bool initializedProgress = false;
   bool uncertain = false;
+
+  String get _cleanEntryId => widget.entryId.replaceFirst(RegExp(r'^ec:'), '');
+
+  Future<void> _completeEc() async {
+    setState(() {
+      saving = true;
+      error = null;
+    });
+    try {
+      await ref.read(apiClientProvider).dio.post(
+        '/inbox/api/workhub-tasks/ec/$_cleanEntryId/progress',
+        data: {
+          'percentage': 100,
+          'note': 'Status diubah menjadi Selesai.',
+          'submission_key': const Uuid().v4(),
+        },
+      );
+      if (!mounted) return;
+      percent.text = '100';
+      note.clear();
+      ref.invalidate(_ecDetailProvider(widget.entryId));
+      ref.invalidate(ecProgressProvider);
+      ref.read(inboxNotifierProvider.notifier).loadInbox();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          error = 'Unable to complete EC. Tap refresh or try again.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
 
   @override
   void initState() {
@@ -95,7 +129,7 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
     });
     try {
       await ref.read(apiClientProvider).dio.post(
-          '/inbox/api/workhub-tasks/ec/${widget.entryId}/progress',
+          '/inbox/api/workhub-tasks/ec/$_cleanEntryId/progress',
           data: attempt);
       if (!mounted) return;
       attempt = null;
@@ -139,9 +173,52 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
       loading: () => formatCreatedDate(widget.createdAt),
       error: (_, __) => formatCreatedDate(widget.createdAt),
     );
+    final ecCompleteFab = MediaQuery.viewInsetsOf(context).bottom > 0
+        ? null
+        : detailState.when<Widget?>(
+            data: (detail) {
+              final current = detail['current_progress'];
+              final pct = current is Map
+                  ? (current['percentage'] as num? ?? 0).toInt()
+                  : 0;
+              if (pct >= 100) return null;
+              return _EcDetailCompleteAction(
+                entryId: _cleanEntryId,
+                onCompleted: () {
+                  percent.text = '100';
+                  note.clear();
+                },
+              );
+            },
+            loading: () => null,
+            error: (_, __) => null,
+          );
     return OrbitWorkspaceScaffold(
       subtitle: createdDate,
-      appBar: AppBar(title: Text(title)),
+      floatingActionButton: ecCompleteFab,
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh EC',
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            onPressed: () async {
+              try {
+                await ref.refresh(_ecDetailProvider(widget.entryId).future);
+                if (mounted) {
+                  setState(() {
+                    uncertain = false;
+                    attempt = null;
+                    error = null;
+                  });
+                }
+              } catch (_) {
+                ref.invalidate(_ecDetailProvider(widget.entryId));
+              }
+            },
+          ),
+        ],
+      ),
       body: detailState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => Center(
@@ -364,6 +441,40 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
                       OrbitColors.primaryNavy),
                 ),
               ),
+              if (progress < 100) ...[
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF15803D),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.check_circle_outline, size: 20),
+                    label: Text(
+                      saving ? 'Completing…' : 'Complete EC (100%)',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    onPressed: saving ? null : _completeEc,
+                  ),
+                ),
+              ],
               if (detail['can_update_progress'] == true) ...[
                 const SizedBox(height: 16),
                 const Divider(height: 1, color: OrbitColors.cardBorder),
@@ -518,6 +629,147 @@ class _EcInboxDetailScreenState extends ConsumerState<EcInboxDetailScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _EcDetailCompleteAction extends ConsumerStatefulWidget {
+  final String entryId;
+  final VoidCallback? onCompleted;
+
+  const _EcDetailCompleteAction({
+    required this.entryId,
+    this.onCompleted,
+  });
+
+  @override
+  ConsumerState<_EcDetailCompleteAction> createState() =>
+      _EcDetailCompleteActionState();
+}
+
+class _EcDetailCompleteActionState
+    extends ConsumerState<_EcDetailCompleteAction> {
+  bool busy = false;
+  bool uncertain = false;
+  String? submissionKey;
+
+  Future<void> perform() async {
+    if (busy || uncertain) return;
+    submissionKey ??= const Uuid().v4();
+    setState(() => busy = true);
+    try {
+      final cleanId = widget.entryId.replaceFirst(RegExp(r'^ec:'), '');
+      final response = await ref.read(apiClientProvider).dio.post(
+        '/inbox/api/workhub-tasks/ec/$cleanId/progress',
+        data: {
+          'percentage': 100,
+          'note': 'Status diubah menjadi Selesai.',
+          'submission_key': submissionKey,
+        },
+      );
+      final code = response.statusCode ?? 0;
+      if (!mounted) return;
+      if (code >= 200 && code < 300) {
+        submissionKey = null;
+        widget.onCompleted?.call();
+        ref.invalidate(_ecDetailProvider(widget.entryId));
+        ref.invalidate(ecProgressProvider);
+        ref.read(inboxNotifierProvider.notifier).loadInbox();
+        setState(() => busy = false);
+      } else {
+        setState(() {
+          busy = false;
+          uncertain = true;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        busy = false;
+        uncertain = true;
+      });
+    }
+  }
+
+  Future<void> refresh() async {
+    setState(() => busy = true);
+    try {
+      final updated =
+          await ref.refresh(_ecDetailProvider(widget.entryId).future);
+      if (updated['title'] == null && updated['current_progress'] == null) {
+        throw const FormatException('EC state is unavailable');
+      }
+      if (mounted) {
+        setState(() => uncertain = false);
+      }
+    } catch (_) {
+      // Keep the action disabled until EC state can be verified.
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (uncertain) {
+      return Material(
+        elevation: 6,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 190,
+                child: Text(
+                  'The EC update could not be confirmed. Refresh before retrying.',
+                  style: TextStyle(fontSize: 12, color: OrbitColors.textNavy),
+                ),
+              ),
+              TextButton(
+                onPressed: busy ? null : refresh,
+                child: const Text('Refresh'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Container(
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x3306244D),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: FloatingActionButton(
+        heroTag: 'ec-complete-${widget.entryId}',
+        tooltip: 'Complete EC',
+        backgroundColor: OrbitColors.primaryNavy,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        highlightElevation: 0,
+        onPressed: busy ? null : perform,
+        child: busy
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(
+                Icons.check_rounded,
+                size: 28,
+              ),
       ),
     );
   }

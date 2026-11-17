@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "914046007540",
+    "project_id": "orbit-web-52d94",
+    "storage_bucket": "orbit-web-52d94.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:914046007540:android:1c2ed4a4de4c7d6ef186a1",
+        "android_client_info": {
+          "package_name": "net.kecapsawi.workhub_mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "914046007540-86n0jvhovfh8p64kst1f9jgj7k9fr49o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjgLCKZR6fhwVQgBV1VEDGevhbhq93Bi4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "914046007540-86n0jvhovfh8p64kst1f9jgj7k9fr49o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

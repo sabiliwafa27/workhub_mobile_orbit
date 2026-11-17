@@ -9,6 +9,30 @@ class ExpandingFabAction {
   final VoidCallback onPressed;
 }
 
+/// Computes responsive bottom offset for FloatingActionButtons on screens
+/// displayed inside [OrbitMainShell] (which uses `extendBody: true` and the
+/// floating [WorkHubNavigationBar]) so the `+` button always sits comfortably
+/// above the bottom navigation pill and system gesture/navigation bar across
+/// compact, standard, and tall mobile screens.
+double orbitResponsiveFabBottomOffset(BuildContext context) {
+  final media = MediaQuery.of(context);
+  final systemBottom = media.viewPadding.bottom > media.padding.bottom
+      ? media.viewPadding.bottom
+      : media.padding.bottom;
+  // WorkHubNavigationBar height (68) + bottom margin (16) = 84.
+  const navBarclearance = 88.0;
+  // Scale extra breathing room mildly with screen height so taller phones lift
+  // the FAB slightly higher while compact phones stay within easy thumb reach.
+  final extraLift = ((media.size.height - 640.0) * 0.035).clamp(8.0, 24.0);
+  return navBarclearance + systemBottom + extraLift;
+}
+
+/// Computes responsive bottom list padding so scrollable content can scroll
+/// completely past both the floating navigation bar and the `+` FAB.
+double orbitResponsiveListBottomPadding(BuildContext context) {
+  return orbitResponsiveFabBottomOffset(context) + 76.0;
+}
+
 class OrbitPlusFab extends StatelessWidget {
   final VoidCallback onPressed;
   final String? tooltip;

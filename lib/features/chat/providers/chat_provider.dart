@@ -96,6 +96,7 @@ class ChatNotifier extends StateNotifier<ChatListState> {
   final ChatRepository _repo;
   final ReverbRealtimeService _reverb;
   final int? _userId;
+  bool _hasLoaded = false;
 
   ChatNotifier(this._repo, this._reverb, this._userId)
       : super(ChatListState()) {
@@ -103,13 +104,21 @@ class ChatNotifier extends StateNotifier<ChatListState> {
     _setupRealtime();
   }
 
-  Future<void> loadChats({String? search, String? filter}) async {
-    state = state.copyWith(isLoading: true, error: null);
+  Future<void> loadChats({
+    String? search,
+    String? filter,
+    bool showLoading = true,
+  }) async {
+    if (showLoading && !_hasLoaded) {
+      state = state.copyWith(isLoading: true, error: null);
+    }
     try {
       final items =
           await _repo.fetchConversations(search: search, filter: filter);
-      state = state.copyWith(chats: items, isLoading: false);
+      _hasLoaded = true;
+      state = state.copyWith(chats: items, isLoading: false, error: null);
     } catch (e) {
+      _hasLoaded = true;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -118,12 +127,16 @@ class ChatNotifier extends StateNotifier<ChatListState> {
     if (_userId != null) {
       _reverb.subscribe('private-App.Models.User.$_userId', (eventData) {
         // Reload conversations when user receives a new message/mention
-        loadChats();
+        loadChats(showLoading: false);
+      });
+      _reverb.subscribe('private-inbox.user.$_userId', (eventData) {
+        // ORBIT publishes inbox.refresh on this channel after committed updates.
+        loadChats(showLoading: false);
       });
     }
 
     _reverb.subscribe('chat-updates', (eventData) {
-      loadChats();
+      loadChats(showLoading: false);
     });
   }
 

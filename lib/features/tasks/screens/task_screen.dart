@@ -20,7 +20,13 @@ enum TaskBoardPeriod { today, week, month, overdue, all }
 
 class TaskScreen extends ConsumerStatefulWidget {
   final VoidCallback? onOpenNotifications, onOpenProfile;
-  const TaskScreen({super.key, this.onOpenNotifications, this.onOpenProfile});
+  final bool showFloatingActionButton;
+  const TaskScreen({
+    super.key,
+    this.onOpenNotifications,
+    this.onOpenProfile,
+    this.showFloatingActionButton = true,
+  });
 
   @override
   ConsumerState<TaskScreen> createState() => _TaskScreenState();
@@ -32,7 +38,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   final _scrollController = ScrollController();
   final _busyTasks = <int>{};
   bool _showFilters = false;
-  TaskBoardPeriod _period = TaskBoardPeriod.today;
+  TaskBoardPeriod _period = TaskBoardPeriod.all;
   String _status = 'all';
   String _priority = '';
   DateTimeRange? _dateRange;
@@ -48,7 +54,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     _priorityFuture = ref.read(taskRepositoryProvider).fetchPriorities();
     _ideasFuture = _loadIdeas('');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _selectPeriod(TaskBoardPeriod.today);
+      if (mounted) _selectPeriod(TaskBoardPeriod.all);
     });
   }
 
@@ -228,85 +234,6 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Priority',
-                                      style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: OrbitColors.textNavy)),
-                                  const SizedBox(height: 6),
-                                  FutureBuilder<Map<String, dynamic>>(
-                                    future: _priorityFuture,
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState ==
-                                          ConnectionState.waiting) {
-                                        return const LinearProgressIndicator();
-                                      }
-                                      if (snapshot.hasError) {
-                                        return TextButton(
-                                            onPressed: () {
-                                              _reloadPriorities();
-                                              setModalState(() {});
-                                            },
-                                            child: const Text(
-                                                'Priority is unavailable. Retry'));
-                                      }
-                                      final payload =
-                                          snapshot.data ?? const <String, dynamic>{};
-                                      final rows = payload['data'] is List
-                                          ? payload['data'] as List
-                                          : const [];
-                                      final meta = payload['meta'];
-                                      return Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            if (rows.isEmpty)
-                                              const Padding(
-                                                  padding:
-                                                      EdgeInsets.symmetric(vertical: 8),
-                                                  child:
-                                                      Text('No priority tasks yet.')),
-                                            for (final row in rows.whereType<Map>())
-                                              ListTile(
-                                                dense: true,
-                                                contentPadding: EdgeInsets.zero,
-                                                title: Text(
-                                                    (row['title'] ?? 'Task').toString(),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis),
-                                                trailing: IconButton(
-                                                    tooltip: 'Remove from Priority',
-                                                    icon: const Icon(
-                                                        Icons.remove_circle_outline),
-                                                    onPressed: () async {
-                                                      await ref
-                                                          .read(taskRepositoryProvider)
-                                                          .removePriority(
-                                                              (row['task_id'] as num)
-                                                                  .toInt());
-                                                      if (!mounted) return;
-                                                      _reloadPriorities();
-                                                      setModalState(() {});
-                                                      ref
-                                                          .read(taskNotifierProvider
-                                                              .notifier)
-                                                          .loadTasks();
-                                                    }),
-                                                onTap: () => Navigator.of(context).push(
-                                                    MaterialPageRoute(
-                                                        builder: (_) =>
-                                                            TaskDetailScreen(
-                                                                taskId: (row['task_id']
-                                                                        as num)
-                                                                    .toInt()))),
-                                              ),
-                                            if (meta is Map &&
-                                                (meta['last_page'] as num? ?? 1) > 1)
-                                              const Text(
-                                                  'Showing your saved priority tasks'),
-                                          ]);
-                                    },
-                                  ),
-                                  const Divider(height: 24),
                                   if (canManageEc) ...[
                                     const Text('EC Today Ideas',
                                         style: TextStyle(
@@ -738,7 +665,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     if (taskState.isLoading) {
       boardTitle = 'Loading tasks…';
     } else if (taskState.scope == TaskScope.delegatedByMe) {
-      boardTitle = 'Delegated Tasks (${tasks.length})';
+      boardTitle = 'Assigned to Others (${tasks.length})';
     } else if (showAll) {
       boardTitle = 'Tasks (${taskState.total})';
     } else {
@@ -774,28 +701,32 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
               badge: _status != 'all' || _priority.isNotEmpty || _dateRange != null,
             ),
           ]),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80),
-        child: OrbitPlusFab(
-          heroTag: 'task-board-fab',
-          tooltip: 'Create task',
-          onPressed: () async {
-            final created = await Navigator.of(context).push<bool>(
-                MaterialPageRoute(
-                    builder: (_) => const CreateWorkItemScreen()));
-            if (created == true && mounted) {
-              ref.read(taskNotifierProvider.notifier).loadTasks();
-              ref.invalidate(dashboardTasksProvider);
-              ref.invalidate(dashboardTaskStatsProvider);
-            }
-          },
-        ),
-      ),
+      floatingActionButton: !widget.showFloatingActionButton
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(
+                  bottom: orbitResponsiveFabBottomOffset(context)),
+              child: OrbitPlusFab(
+                heroTag: 'task-board-fab',
+                tooltip: 'Create task',
+                onPressed: () async {
+                  final created = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                          builder: (_) => const CreateWorkItemScreen()));
+                  if (created == true && mounted) {
+                    ref.read(taskNotifierProvider.notifier).loadTasks();
+                    ref.invalidate(dashboardTasksProvider);
+                    ref.invalidate(dashboardTaskStatsProvider);
+                  }
+                },
+              ),
+            ),
       body: RefreshIndicator(
           onRefresh: () => ref.read(taskNotifierProvider.notifier).loadTasks(),
           child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+              padding: EdgeInsets.fromLTRB(
+                  12, 12, 12, orbitResponsiveListBottomPadding(context)),
               children: [
                 Container(
                     key: const ValueKey('task-scope-toggle'),
@@ -888,7 +819,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                                                 color: Colors.white),
                                             const SizedBox(width: 5),
                                             Flexible(
-                                              child: Text('Delegated by Me',
+                                              child: Text('Assign to Others',
                                                   maxLines: 1,
                                                   overflow:
                                                       TextOverflow.ellipsis,
@@ -915,6 +846,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                             color: Colors.white.withValues(alpha: .4))),
                     child: Row(children: [
                       for (final entry in const [
+                        (TaskBoardPeriod.all, 'All'),
                         (TaskBoardPeriod.today, 'Today'),
                         (TaskBoardPeriod.week, 'This Week'),
                         (TaskBoardPeriod.month, 'Month'),
@@ -949,6 +881,82 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                                                     : FontWeight.w400,
                                                 color: Colors.white))))))
                     ])),
+                const SizedBox(height: 12),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _priorityFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError || !snapshot.hasData) {
+                      return const SizedBox.shrink();
+                    }
+                    final payload = snapshot.data!;
+                    final rows = payload['data'] is List
+                        ? (payload['data'] as List).whereType<Map>().toList()
+                        : const <Map>[];
+                    if (rows.isEmpty) return const SizedBox.shrink();
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: OrbitSurface(
+                        padding: EdgeInsets.zero,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(14, 12, 14, 4),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.star_rounded,
+                                      color: OrbitColors.primaryNavy, size: 20),
+                                  SizedBox(width: 7),
+                                  Text(
+                                    'Priority',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: OrbitColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            for (final row in rows)
+                              ListTile(
+                                dense: true,
+                                title: Text(
+                                  (row['title'] ?? 'Task').toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: IconButton(
+                                  tooltip: 'Remove from Priority',
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                  onPressed: () async {
+                                    final taskId =
+                                        (row['task_id'] as num).toInt();
+                                    await ref
+                                        .read(taskRepositoryProvider)
+                                        .removePriority(taskId);
+                                    if (!mounted) return;
+                                    _reloadPriorities();
+                                    ref
+                                        .read(taskNotifierProvider.notifier)
+                                        .loadTasks(showLoading: false);
+                                  },
+                                ),
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => TaskDetailScreen(
+                                      taskId: (row['task_id'] as num).toInt(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 12),
                 OrbitSurface(
                     padding: EdgeInsets.zero,
@@ -999,13 +1007,10 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                                 child: Center(
                                     child: Text(taskState.scope ==
                                             TaskScope.delegatedByMe
-                                        ? 'No delegated tasks found for this period'
+                                        ? 'No tasks assigned to others found for this period'
                                         : 'No tasks assigned for this period')))
                           else
                             for (var i = 0; i < tasks.length; i++) ...[
-                              if (i > 0)
-                                const Divider(
-                                    height: 1, indent: 14, endIndent: 14),
                               TaskBoardRow(
                                   task: tasks[i],
                                   busy: _busyTasks.contains(tasks[i].id),

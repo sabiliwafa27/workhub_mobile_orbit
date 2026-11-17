@@ -98,6 +98,7 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
 
   void _showProfileDialog() {
     final user = ref.read(authProvider).user;
+    final photo = user?.profilePhotoUrl;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -116,15 +117,34 @@ class _WhatsAppMainScreenState extends ConsumerState<WhatsAppMainScreen> {
                 radius: 36,
                 backgroundColor:
                     WhatsAppColors.tealGreen.withValues(alpha: 0.2),
-                child: Text(
-                  user?.name.isNotEmpty == true
-                      ? user!.name[0].toUpperCase()
-                      : 'U',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: WhatsAppColors.tealGreen,
-                  ),
+                child: ClipOval(
+                  child: photo != null && photo.isNotEmpty
+                      ? Image.network(
+                          photo,
+                          width: 72,
+                          height: 72,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Text(
+                            user?.name.isNotEmpty == true
+                                ? user!.name[0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: WhatsAppColors.tealGreen,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          user?.name.isNotEmpty == true
+                              ? user!.name[0].toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: WhatsAppColors.tealGreen,
+                          ),
+                        ),
                 ),
               ),
             ),

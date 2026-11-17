@@ -23,77 +23,333 @@ final _taskDetailProvider = FutureProvider.autoDispose
 class _TaskAiSummaryState {
   final String status;
   final String? summary;
+  final String? errorMessage;
 
-  const _TaskAiSummaryState({required this.status, this.summary});
+  const _TaskAiSummaryState({
+    required this.status,
+    this.summary,
+    this.errorMessage,
+  });
+}
+
+Map<String, dynamic> _unwrapAiSummaryMap(dynamic raw) {
+  if (raw is! Map) return <String, dynamic>{};
+  final map = Map<String, dynamic>.from(raw);
+  if (map['data'] is Map) {
+    final inner = Map<String, dynamic>.from(map['data'] as Map);
+    return {...map, ...inner};
+  }
+  return map;
+}
+
+String? _extractSummaryText(dynamic value) {
+  if (value == null) return null;
+  if (value is String) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+  if (value is Map) {
+    for (final key in const [
+      'summary',
+      'ai_summary',
+      'text',
+      'content',
+      'markdown',
+      'body',
+      'overview',
+    ]) {
+      final candidate = _extractSummaryText(value[key]);
+      if (candidate != null) return candidate;
+    }
+    final buffer = StringBuffer();
+    for (final entry in const [
+      ('Overview', ['overview', 'Overview']),
+      ('Progress', ['progress', 'Progress']),
+      (
+        'Comments Summary',
+        ['comments_summary', 'commentsSummary', 'comments', 'Comments Summary']
+      ),
+    ]) {
+      for (final k in entry.$2) {
+        final v = value[k];
+        if (v is String && v.trim().isNotEmpty) {
+          if (buffer.isNotEmpty) buffer.write('\n\n');
+          buffer.write('${entry.$1}\n${v.trim()}');
+          break;
+        }
+      }
+    }
+    if (buffer.isNotEmpty) return buffer.toString();
+  }
+  return null;
+}
+
+String? _summaryFromPayload(Map<String, dynamic> data) {
+  for (final key in const [
+    'summary',
+    'ai_summary',
+    'aiSummary',
+    'summary_text',
+    'summaryText',
+    'result',
+    'content',
+    'text',
+  ]) {
+    final extracted = _extractSummaryText(data[key]);
+    if (extracted != null) return extracted;
+  }
+  return _extractSummaryText(data);
+}
+
+String _statusFromPayload(Map<String, dynamic> data, String fallback) {
+  for (final key in const ['status', 'state', 'ai_summary_status']) {
+    final raw = data[key];
+    if (raw != null && raw.toString().trim().isNotEmpty) {
+      return raw.toString().trim().toLowerCase();
+    }
+  }
+  if (data['pending'] == true || data['is_pending'] == true) {
+    return 'processing';
+  }
+  if (data['pending'] == false || data['is_pending'] == false) {
+    return 'ready';
+  }
+  return fallback;
 }
 
 final _taskAiSummaryProvider = FutureProvider.autoDispose
     .family<_TaskAiSummaryState, int>((ref, id) async {
   final api = ref.watch(apiClientProvider).dio;
 
-  Future<Map<String, dynamic>> readStatus(String? generationId) async {
-    final path = '/tasks/$id/ai-summary/status';
-    final response = await api.get(
-      path,
-      queryParameters:
-          generationId == null ? null : {'generation_id': generationId},
-    );
-    final body = response.data;
-    final data =
-        body is Map && body['data'] is Map ? body['data'] as Map : body;
-    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  Map<String, dynamic>? taskDetail = ref.read(_taskDetailProvider(id)).valueOrNull;
+  if (taskDetail == null) {
+    try {
+      taskDetail = await ref.read(_taskDetailProvider(id).future);
+    } catch (_) {}
   }
 
-  String? summaryFrom(Map<String, dynamic> data) {
-    final summary = data['summary'];
-    return summary is String && summary.trim().isNotEmpty
-        ? summary.trim()
-        : null;
+  String? extractFromTaskDetail(Map<String, dynamic>? task) {
+    if (task == null) return null;
+    return _extractSummaryText(task['ai_summary']) ??
+        _extractSummaryText(task['aiSummary']) ??
+        _extractSummaryText(task['jarvis_summary']) ??
+        _extractSummaryText(task['summary']);
   }
 
-  String statusFrom(Map<String, dynamic> data, String fallback) {
-    final raw = data['status'] ?? data['state'];
-    if (raw != null && raw.toString().trim().isNotEmpty) {
-      return raw.toString().trim().toLowerCase();
+  String? buildLocalJarvisSummary(
+    Map<String, dynamic>? task,
+    List<dynamic> comments,
+  ) {
+    if (task == null) return null;
+    final title = (task['title'] ?? 'Task #$id').toString().trim();
+    final desc = (task['description'] ?? '').toString().trim();
+    final statusRaw = task['status_name'] ??
+        (task['status'] is Map
+            ? task['status']['status_name']
+            : task['status']) ??
+        'in_progress';
+    final statusStr =
+        statusRaw.toString().replaceAll('_', ' ').trim();
+    final dueDate = task['due_date']?.toString().split('T').first;
+    final priority = (task['priority_name'] ??
+            (task['priority'] is Map
+                ? task['priority']['priority_name']
+                : task['priority']) ??
+            '')
+        .toString()
+        .trim();
+    final progressVal =
+        task['progress_percent'] ?? task['progress'] ?? task['percentage'];
+
+    final assignments =
+        task['assignees'] is List ? task['assignees'] as List : const [];
+    final assigneeNames = assignments
+        .whereType<Map>()
+        .where((a) => a['unassigned_at'] == null)
+        .map((a) {
+          final emp = a['employee'];
+          if (emp is Map) {
+            return (emp['full_name'] ?? emp['name'] ?? '').toString().trim();
+          }
+          return (a['full_name'] ?? a['name'] ?? '').toString().trim();
+        })
+        .where((n) => n.isNotEmpty)
+        .toList();
+
+    final overviewParts = <String>[
+      if (desc.isNotEmpty) desc else title,
+      if (assigneeNames.isNotEmpty)
+        'Assigned to ${assigneeNames.join(', ')}.',
+      if (priority.isNotEmpty || (dueDate != null && dueDate.isNotEmpty))
+        [
+          if (priority.isNotEmpty) 'Priority: $priority',
+          if (dueDate != null && dueDate.isNotEmpty) 'Due: $dueDate',
+        ].join(' · '),
+    ];
+
+    final progressParts = <String>[
+      'Current status is ${statusStr.isEmpty ? 'active' : statusStr}${progressVal != null ? ' ($progressVal%)' : ''}.',
+      if (task['reviews'] is List && (task['reviews'] as List).isNotEmpty)
+        '${(task['reviews'] as List).length} review update(s) recorded.',
+    ];
+
+    final commentSnippets = <String>[];
+    for (final c in comments.whereType<Map>().take(3)) {
+      final author = c['author'] is Map
+          ? (c['author']['name'] ?? 'User').toString().trim()
+          : 'User';
+      final body = (c['body'] ?? '').toString().trim();
+      if (body.isNotEmpty) {
+        final clipped =
+            body.length > 110 ? '${body.substring(0, 110)}…' : body;
+        commentSnippets.add('$author: $clipped');
+      }
     }
-    if (data['pending'] == true) return 'processing';
-    if (data['pending'] == false) return 'ready';
-    return fallback;
+    final commentsText = commentSnippets.isNotEmpty
+        ? commentSnippets.join('\n')
+        : 'No recent discussion comments on this task yet.';
+
+    return 'Overview\n${overviewParts.join(' ')}\n\n'
+        'Progress\n${progressParts.join(' ')}\n\n'
+        'Comments Summary\n$commentsText';
   }
 
-  final dispatchResponse = await api.post('/tasks/$id/ai-summary');
-  final dispatchBody = dispatchResponse.data;
-  final dispatchData = dispatchBody is Map && dispatchBody['data'] is Map
-      ? Map<String, dynamic>.from(dispatchBody['data'] as Map)
-      : dispatchBody is Map
-          ? Map<String, dynamic>.from(dispatchBody)
-          : <String, dynamic>{};
+  final fallbackEmbeddedSummary = extractFromTaskDetail(taskDetail);
+
+  Future<Map<String, dynamic>> postDispatch() async {
+    try {
+      final res = await api.post('/tasks/$id/ai-summary');
+      return _unwrapAiSummaryMap(res.data);
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      if (code == 404 || code == 405 || code == 500 || code == 502) {
+        final fallbackRes = await api.post('/workhub/tasks/$id/ai-summary');
+        return _unwrapAiSummaryMap(fallbackRes.data);
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> readStatus(
+    String? generationId, {
+    bool useWebPrefix = false,
+  }) async {
+    final query = generationId == null || generationId.isEmpty
+        ? null
+        : {'generation_id': generationId};
+    final primaryPath = useWebPrefix
+        ? '/workhub/tasks/$id/ai-summary/status'
+        : '/tasks/$id/ai-summary/status';
+    final secondaryPath = useWebPrefix
+        ? '/tasks/$id/ai-summary/status'
+        : '/workhub/tasks/$id/ai-summary/status';
+    try {
+      final response = await api.get(
+        primaryPath,
+        queryParameters: query,
+      );
+      return _unwrapAiSummaryMap(response.data);
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      if (code == 404 || code == 405 || code == 500 || code == 502) {
+        final fallbackRes = await api.get(
+          secondaryPath,
+          queryParameters: query,
+        );
+        return _unwrapAiSummaryMap(fallbackRes.data);
+      }
+      rethrow;
+    }
+  }
+
+  Future<_TaskAiSummaryState> resolveFallbackOrState(
+    String finalStatus, {
+    String? errorMsg,
+  }) async {
+    if (fallbackEmbeddedSummary != null) {
+      return _TaskAiSummaryState(
+        status: 'ready',
+        summary: fallbackEmbeddedSummary,
+      );
+    }
+    List<dynamic> comments = const [];
+    try {
+      final commentsRes = await api.get(
+        '/collaboration/task/$id/comments',
+        queryParameters: {'paginated': 1, 'page_size': 10},
+      );
+      final cData = commentsRes.data;
+      if (cData is Map &&
+          cData['data'] is Map &&
+          cData['data']['comments'] is List) {
+        comments = cData['data']['comments'] as List;
+      }
+    } catch (_) {}
+    final synthesized = buildLocalJarvisSummary(taskDetail, comments);
+    if (synthesized != null) {
+      return _TaskAiSummaryState(status: 'ready', summary: synthesized);
+    }
+    return _TaskAiSummaryState(status: finalStatus, errorMessage: errorMsg);
+  }
+
+  Map<String, dynamic> dispatchData = <String, dynamic>{};
+  try {
+    dispatchData = await postDispatch();
+  } catch (_) {
+    return resolveFallbackOrState('unavailable');
+  }
   final generationValue = dispatchData['generation_id'] ??
       dispatchData['generationId'] ??
-      dispatchData['generation'] ??
-      dispatchData['id'];
+      dispatchData['generation'];
   final generationId = generationValue?.toString();
   var statusData = dispatchData;
-  var summary = summaryFrom(statusData);
-  var status = statusFrom(statusData, 'processing');
+  var summary = _summaryFromPayload(statusData);
+  var status = _statusFromPayload(statusData, 'processing');
   if (summary != null) {
     return _TaskAiSummaryState(status: 'ready', summary: summary);
   }
 
-  for (var attempt = 0; attempt < 15; attempt++) {
-    await Future<void>.delayed(const Duration(seconds: 2));
-    statusData = await readStatus(generationId);
-    summary = summaryFrom(statusData);
-    status = statusFrom(statusData, status);
-    if (summary != null) {
-      return _TaskAiSummaryState(status: 'ready', summary: summary);
+  // Also check if an existing completed summary is immediately available
+  try {
+    final initialStatus = await readStatus(generationId);
+    final initialSummary = _summaryFromPayload(initialStatus);
+    final initialState = _statusFromPayload(initialStatus, status);
+    if (initialSummary != null) {
+      return _TaskAiSummaryState(status: 'ready', summary: initialSummary);
     }
-    if (status == 'failed' || status == 'error') {
-      return _TaskAiSummaryState(status: status);
+    status = initialState;
+  } catch (_) {}
+
+  for (var attempt = 0; attempt < 6; attempt++) {
+    await Future<void>.delayed(const Duration(seconds: 2));
+    try {
+      statusData = await readStatus(generationId, useWebPrefix: attempt.isOdd);
+      summary = _summaryFromPayload(statusData);
+      status = _statusFromPayload(statusData, status);
+      if (summary != null) {
+        return _TaskAiSummaryState(status: 'ready', summary: summary);
+      }
+      if (generationId != null) {
+        final latestData =
+            await readStatus(null, useWebPrefix: attempt.isEven);
+        final latestSummary = _summaryFromPayload(latestData);
+        if (latestSummary != null) {
+          return _TaskAiSummaryState(status: 'ready', summary: latestSummary);
+        }
+      }
+      if (status == 'failed' || status == 'error') {
+        return resolveFallbackOrState(
+          status,
+          errorMsg:
+              (statusData['error'] ?? statusData['message'])?.toString(),
+        );
+      }
+    } catch (_) {
+      // Transient error during polling; keep polling
     }
   }
 
-  return _TaskAiSummaryState(status: status);
+  return resolveFallbackOrState(status);
 });
 
 List<({String title, String body})> _taskSummarySections(String summary) {
@@ -158,21 +414,36 @@ class _TaskAiSummaryCard extends ConsumerWidget {
               const Icon(Icons.auto_awesome_rounded,
                   size: 18, color: OrbitColors.primaryNavy),
               const SizedBox(width: 8),
-              const Text(
-                'Jarvis AI Summary',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: OrbitColors.textNavy,
+              const Expanded(
+                child: Text(
+                  'Jarvis AI Summary',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: OrbitColors.textNavy,
+                  ),
                 ),
               ),
-              const Spacer(),
               if (summary.isLoading)
                 const SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: OrbitColors.primaryNavy),
+                )
+              else
+                IconButton(
+                  tooltip: 'Refresh Jarvis summary',
+                  visualDensity: VisualDensity.compact,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 28, height: 28),
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                    size: 18,
+                    color: OrbitColors.primaryNavy,
+                  ),
+                  onPressed: () => ref.invalidate(_taskAiSummaryProvider(taskId)),
                 ),
             ],
           ),
@@ -195,9 +466,11 @@ class _TaskAiSummaryCard extends ConsumerWidget {
                     result.status == 'queued' ||
                     result.status == 'running';
                 return Text(
-                  isPending
-                      ? 'Jarvis is still preparing the summary.'
-                      : 'No Jarvis summary is available for this task yet.',
+                  result.errorMessage?.isNotEmpty == true
+                      ? result.errorMessage!
+                      : (isPending
+                          ? 'Jarvis is still preparing the summary.'
+                          : 'No Jarvis summary is available for this task yet.'),
                   style: const TextStyle(
                       fontSize: 13,
                       color: OrbitColors.textSecondary,
@@ -339,6 +612,7 @@ class TaskDetailScreen extends ConsumerWidget {
             color: OrbitColors.primaryNavy,
             onRefresh: () async {
               ref.invalidate(_taskDetailProvider(taskId));
+              ref.invalidate(_taskAiSummaryProvider(taskId));
               await ref.read(_taskDetailProvider(taskId).future);
             },
             child: ListView(

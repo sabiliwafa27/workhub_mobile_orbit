@@ -12,6 +12,7 @@ import 'package:workhub_mobile/features/auth/providers/auth_provider.dart';
 import 'package:workhub_mobile/features/auth/screens/login_screen.dart';
 import 'package:workhub_mobile/features/auth/screens/profile_screen.dart';
 import 'package:workhub_mobile/features/auth/services/passkey_service.dart';
+import 'package:workhub_mobile/features/tasks/screens/task_detail_screen.dart';
 
 class _FakeStorage extends SecureStorageService {
   String? savedToken;
@@ -167,9 +168,145 @@ class _PasskeyAndSummaryAdapter implements HttpClientAdapter {
             'name': 'Budi Santosa',
             'preferred_name': 'Budi',
             'email': 'budi@kecapsawi.net',
+            'profile_photo_url': null,
             'passkeys': passkeys,
+            'employee': {
+              'id': 101,
+              'full_name': 'Budi Santosa',
+              'preferred_name': 'Budi',
+              'photo_url':
+                  'https://orbit.kecapsawi.net/storage/employees/photos/budi.webp',
+              'primary_role': {'name': 'Field Sales Supervisor'},
+              'department': {'name': 'Commercial Operations'},
+            },
           },
         },
+      };
+    } else if (options.path == '/api/v1/auth/my-profile') {
+      payload = {
+        'data': {
+          'has_linked_employee': true,
+          'employee_id': 101,
+          'user': {
+            'id': 42,
+            'name': 'Budi Santosa',
+            'preferred_name': 'Budi',
+            'email': 'budi@kecapsawi.net',
+            'profile_photo_url':
+                'https://orbit.kecapsawi.net/storage/employees/photos/budi.webp',
+            'passkeys': passkeys,
+          },
+          'employee': {
+            'id': 101,
+            'full_name': 'Budi Santosa',
+            'preferred_name': 'Budi',
+            'employee_code': 'EMP-0101',
+            'photo_url':
+                'https://orbit.kecapsawi.net/storage/employees/photos/budi.webp',
+            'organization': {'name': 'PT Kecap Sawi'},
+            'department': {'name': 'Commercial Operations'},
+            'branch': {'name': 'Kediri HQ'},
+            'bank': {'name': 'BCA'},
+            'bank_account_number': '1234567890',
+            'status': {'name': 'Active'},
+            'manager': {'full_name': 'Hendra Wijaya'},
+            'primaryRole': {'name': 'Field Sales Supervisor'},
+            'responsibleHr': {'full_name': 'Siti Rahma'},
+            'timeOffApprover': {'full_name': 'Hendra Wijaya'},
+            'attendanceApprover': {'full_name': 'Siti Rahma'},
+            'directReports': [
+              {'full_name': 'Andi Pratama'},
+              {'full_name': 'Rina Sari'},
+            ],
+            'skills': [
+              {'name': 'Key Account Management', 'level': 'Advanced'},
+            ],
+            'certifications': [
+              {'name': 'FMCG Sales Excellence', 'issuer': 'Orbit Academy'},
+            ],
+            'educations': [
+              {'institution': 'Universitas Brawijaya', 'degree': 'S1 Manajemen'},
+            ],
+            'assignmentHistories': [
+              {'role_name': 'Area Sales Executive', 'department': 'East Java'},
+            ],
+            'documents': [
+              {'document_name': 'Employment Contract 2026'},
+            ],
+            'resumes': [
+              {'title': 'Budi Santosa CV'},
+            ],
+            'testResults': [
+              {'name': 'Leadership Assessment', 'score': '92'},
+            ],
+            'notesHistory': [
+              {'note': 'Promoted to supervisor Q3'},
+            ],
+            'salesSchedule': [
+              {'day': 'Monday', 'status': 'Kediri North Route'},
+            ],
+          },
+        },
+      };
+    } else if (options.path == '/api/v1/auth/login-background') {
+      payload = {
+        'data': {
+          'webp_url':
+              'https://orbit.kecapsawi.net/login-desktop.webp?v=1793582708',
+          'jpg_url':
+              'https://orbit.kecapsawi.net/login-desktop.jpg?v=1793582708',
+          'direct_webp_url':
+              'https://orbit.kecapsawi.net/images/auth/login-desktop.webp?v=1793582708',
+          'version': '1793582708',
+          'updated_at': '2026-11-02T01:25:08+00:00',
+        },
+      };
+    } else if (options.path == '/workhub/api/v1/tasks/79/payload') {
+      payload = {
+        'task': {
+          'id': 79,
+          'title': 'Prepare Monthly Orbit Report',
+          'status': 'in_progress',
+          'description': 'Compile field sales metrics.',
+          'assignees': [],
+        },
+      };
+    } else if (options.path.contains('/collaboration/') ||
+        options.path.contains('/comments')) {
+      payload = {
+        'data': {
+          'subject': {'can_comment': false},
+          'comments': [],
+          'pagination': {'has_older': false},
+        },
+      };
+    } else if (options.path == '/workhub/api/v1/tasks/80/payload') {
+      payload = {
+        'task': {
+          'id': 80,
+          'title': 'Audit East Java Warehouse',
+          'status': 'in_progress',
+          'progress_percent': 65,
+          'priority': 'high',
+          'due_date': '2026-11-20',
+          'description': 'Verify stock levels in East Java warehouse.',
+          'assignees': [
+            {
+              'unassigned_at': null,
+              'employee': {'full_name': 'Budi Santosa'},
+            },
+          ],
+        },
+      };
+    } else if (options.path == '/workhub/api/v1/tasks/80/ai-summary' ||
+        options.path == '/workhub/api/v1/tasks/80/ai-summary/status' ||
+        options.path == '/workhub/tasks/80/ai-summary/status') {
+      statusCode = options.method == 'POST' ? 202 : 200;
+      payload = {
+        'task_id': 80,
+        'generation_id': 'gen-uuid-80',
+        'state': 'queued',
+        'pending': true,
       };
     } else if (options.path == '/workhub/api/v1/tasks/79/ai-summary') {
       statusCode = 202;
@@ -323,7 +460,11 @@ void main() {
     expect(find.text('SECURITY & PASSKEYS'), findsOneWidget);
     expect(find.text('Pixel 9a Biometric'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Add'));
+    await tester.scrollUntilVisible(
+      find.text('Add'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add'));
     await tester.pumpAndSettle();
@@ -335,5 +476,154 @@ void main() {
 
     expect(find.text('My Work Phone'), findsOneWidget);
     expect(find.text('Passkey registered successfully.'), findsOneWidget);
+  });
+
+  testWidgets(
+      'LoginScreen fetches /auth/login-background and ProfileScreen renders full /auth/my-profile employee data and photo fallback',
+      (tester) async {
+    final adapter = _PasskeyAndSummaryAdapter();
+    final storage = _FakeStorage()..savedToken = '2|sanctum-passkey-token';
+    final api = ApiClient(
+      customDio: Dio()..httpClientAdapter = adapter,
+      customStorage: storage,
+    );
+    final bridge = _FakePasskeyBridge();
+    final service = PasskeyService(api, bridge: bridge);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          storageServiceProvider.overrideWithValue(storage),
+          apiClientProvider.overrideWithValue(api),
+          passkeyServiceProvider.overrideWithValue(service),
+        ],
+        child: MaterialApp(
+          theme: OrbitTheme.lightTheme,
+          home: const LoginScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      adapter.requests.any((r) => r.path == '/api/v1/auth/login-background'),
+      isTrue,
+    );
+    expect(
+      find.byKey(const ValueKey(
+        'login-bg-https://orbit.kecapsawi.net/login-desktop.webp?v=1793582708',
+      )),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          storageServiceProvider.overrideWithValue(storage),
+          apiClientProvider.overrideWithValue(api),
+          passkeyServiceProvider.overrideWithValue(service),
+        ],
+        child: MaterialApp(
+          theme: OrbitTheme.lightTheme,
+          home: const ProfileScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      adapter.requests.any((r) => r.path == '/api/v1/auth/my-profile'),
+      isTrue,
+    );
+    expect(find.text('Field Sales Supervisor'), findsWidgets);
+    expect(find.text('Commercial Operations'), findsWidgets);
+    expect(find.text('PT Kecap Sawi'), findsOneWidget);
+    expect(find.text('Kediri HQ'), findsOneWidget);
+    expect(find.text('Hendra Wijaya'), findsWidgets);
+    expect(find.text('Siti Rahma'), findsWidgets);
+    expect(find.text('Andi Pratama, Rina Sari'), findsOneWidget);
+    expect(find.text('Key Account Management • Advanced'), findsOneWidget);
+    expect(
+      find.text('FMCG Sales Excellence • Orbit Academy'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Universitas Brawijaya • S1 Manajemen'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Area Sales Executive • East Java'),
+      findsOneWidget,
+    );
+    expect(find.text('Employment Contract 2026'), findsOneWidget);
+    expect(find.text('Budi Santosa CV'), findsOneWidget);
+    expect(find.text('Leadership Assessment • 92'), findsOneWidget);
+    expect(find.text('Promoted to supervisor Q3'), findsOneWidget);
+    expect(find.text('Monday • Kediri North Route'), findsOneWidget);
+  });
+
+  testWidgets('TaskDetailScreen renders Jarvis AI summary sections when ready',
+      (tester) async {
+    final adapter = _PasskeyAndSummaryAdapter();
+    final storage = _FakeStorage()..savedToken = '2|sanctum-passkey-token';
+    final api = ApiClient(
+      customDio: Dio()..httpClientAdapter = adapter,
+      customStorage: storage,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          storageServiceProvider.overrideWithValue(storage),
+          apiClientProvider.overrideWithValue(api),
+        ],
+        child: MaterialApp(
+          theme: OrbitTheme.lightTheme,
+          home: const TaskDetailScreen(taskId: 79),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Jarvis AI Summary'), findsOneWidget);
+    expect(find.text('Overview'), findsOneWidget);
+    expect(find.text('Task #79 is on track.'), findsOneWidget);
+  });
+
+  testWidgets(
+      'TaskDetailScreen synthesizes structured Jarvis summary when backend stays queued',
+      (tester) async {
+    final adapter = _PasskeyAndSummaryAdapter();
+    final storage = _FakeStorage()..savedToken = '2|sanctum-passkey-token';
+    final api = ApiClient(
+      customDio: Dio()..httpClientAdapter = adapter,
+      customStorage: storage,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          storageServiceProvider.overrideWithValue(storage),
+          apiClientProvider.overrideWithValue(api),
+        ],
+        child: MaterialApp(
+          theme: OrbitTheme.lightTheme,
+          home: const TaskDetailScreen(taskId: 80),
+        ),
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(seconds: 2));
+    }
+    await tester.pumpAndSettle();
+
+    expect(find.text('Jarvis AI Summary'), findsOneWidget);
+    expect(find.text('Overview'), findsOneWidget);
+    expect(find.text('Progress'), findsOneWidget);
+    expect(find.text('Comments Summary'), findsOneWidget);
+    expect(
+      find.textContaining('Verify stock levels in East Java warehouse.'),
+      findsWidgets,
+    );
   });
 }

@@ -19,6 +19,31 @@ final passkeyServiceProvider = Provider<PasskeyService>((ref) {
   return PasskeyService(apiClient);
 });
 
+final loginBackgroundProvider =
+    FutureProvider.autoDispose<LoginBackgroundModel>((ref) async {
+  final apiClient = ref.watch(apiClientProvider);
+  final storage = ref.watch(storageServiceProvider);
+  final baseUrl = await storage.getBaseUrl();
+  try {
+    final response = await apiClient.dio.get('/auth/login-background');
+    final raw = response.data is Map
+        ? Map<String, dynamic>.from(response.data as Map)
+        : <String, dynamic>{};
+    return LoginBackgroundModel.fromJson(raw, fallbackBaseUrl: baseUrl);
+  } catch (_) {
+    return LoginBackgroundModel(webpUrl: '$baseUrl/login-desktop.webp');
+  }
+});
+
+final myProfileProvider =
+    FutureProvider.autoDispose<MyProfileResponse?>((ref) async {
+  final isAuthenticated = ref.watch(
+    authProvider.select((state) => state.isAuthenticated),
+  );
+  if (!isAuthenticated) return null;
+  return ref.read(authProvider.notifier).fetchMyProfile(updateAuthState: false);
+});
+
 class AuthState {
   final bool isLoading;
   final bool isAuthenticated;
@@ -104,6 +129,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isAuthenticated: true,
         user: user,
       );
+      if (user.preferredName == null || user.preferredName!.isEmpty) {
+        await checkAuthStatus();
+      }
       return true;
     } on DioException catch (e) {
       final msg = e.response?.data?['message'] ??
@@ -128,6 +156,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isAuthenticated: true,
         user: result.user,
       );
+      if (result.user.preferredName == null ||
+          result.user.preferredName!.isEmpty) {
+        await checkAuthStatus();
+      }
       return true;
     } on PasskeyCancelledException {
       state = state.copyWith(isLoading: false, errorMessage: null);
@@ -139,6 +171,51 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       return false;
     }
+  }
+
+  Future<MyProfileResponse?> fetchMyProfile({bool updateAuthState = true}) async {
+    try {
+      final response = await _apiClient.dio.get('/auth/my-profile');
+      final raw = response.data is Map
+          ? Map<String, dynamic>.from(response.data as Map)
+          : <String, dynamic>{};
+      final profile = MyProfileResponse.fromJson(raw);
+      if (updateAuthState) {
+        if (profile.user != null) {
+          final mergedUser = _mergeUserWithEmployee(
+            profile.user!,
+            profile.employee,
+            fallbackUser: state.user,
+          );
+          state = state.copyWith(isAuthenticated: true, user: mergedUser);
+        } else if (state.user != null && profile.employee != null) {
+          final mergedUser = _mergeUserWithEmployee(
+            state.user!,
+            profile.employee,
+          );
+          state = state.copyWith(user: mergedUser);
+        }
+      }
+      return profile;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  UserModel _mergeUserWithEmployee(
+    UserModel user,
+    Map<String, dynamic>? employee, {
+    UserModel? fallbackUser,
+  }) {
+    final baseJson = <String, dynamic>{
+      if (fallbackUser?.rawJson != null) ...fallbackUser!.rawJson!,
+      if (user.rawJson != null) ...user.rawJson!,
+    };
+    if (employee != null) {
+      baseJson['employee'] = employee;
+    }
+    if (baseJson.isEmpty) return user;
+    return UserModel.fromJson(baseJson);
   }
 
   Future<PasskeyCredentialModel> registerPasskey({required String name}) async {

@@ -60,10 +60,20 @@ class ReverbRealtimeService {
         }
       }
 
+      if (scheme == 'https' && (port == null || port == 8080)) {
+        port = 443;
+      }
       port ??= ((scheme == 'https') ? 443 : 8080);
       final appKey = data['app_key'] as String? ?? 'erplab_reverb_key';
-      _authEndpoint =
+      var rawAuthEndpoint =
           data['auth_endpoint'] as String? ?? '/broadcasting/auth';
+      final authUri = Uri.tryParse(rawAuthEndpoint);
+      if (authUri != null && authUri.hasAuthority) {
+        rawAuthEndpoint =
+            authUri.path + (authUri.hasQuery ? '?${authUri.query}' : '');
+      }
+      _authEndpoint =
+          rawAuthEndpoint.isNotEmpty ? rawAuthEndpoint : '/broadcasting/auth';
 
       final wsScheme = scheme == 'https' ? 'wss' : 'ws';
       final portSuffix = (scheme == 'https' && port == 443) ||
@@ -124,6 +134,12 @@ class ReverbRealtimeService {
         _channel?.sink.add(jsonEncode({'event': 'pusher:pong', 'data': {}}));
         return;
       }
+      if (event == 'pusher_internal:subscription_succeeded' ||
+          event == 'pusher:subscription_succeeded') {
+        debugPrint(
+            'Reverb subscription succeeded for channel: ${decoded['channel']}');
+        return;
+      }
       if (event == 'pusher:error' || event == 'pusher:subscription_error') {
         debugPrint('Reverb rejected a channel operation: ${decoded['data']}');
         return;
@@ -131,6 +147,7 @@ class ReverbRealtimeService {
 
       final channelName = decoded['channel'] as String?;
       if (channelName == null) return;
+      debugPrint('Reverb event received: ${event ?? 'unknown'} on $channelName');
       final rawData = decoded['data'];
       final data = rawData is String ? _decodeEventData(rawData) : rawData;
       for (final listener in List<void Function(dynamic)>.from(

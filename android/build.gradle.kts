@@ -13,6 +13,14 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
+    if (name == "flutter_app_badger") {
+        plugins.withId("com.android.library") {
+            configure<com.android.build.gradle.LibraryExtension> {
+                namespace = "fr.g123k.flutterappbadger"
+                compileSdk = 34
+            }
+        }
+    }
     project.evaluationDependsOn(":app")
 }
 

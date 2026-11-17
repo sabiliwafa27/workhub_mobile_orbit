@@ -194,7 +194,7 @@ void main() {
                 child: const Text('Open task'))))));
     await tester.tap(find.text('Open task'));
     await tester.pumpAndSettle();
-    expect(find.text('Task details'), findsOneWidget);
+    expect(find.text('Prepare the weekly operations review'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('Open task'), findsOneWidget);

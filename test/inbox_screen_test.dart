@@ -24,6 +24,7 @@ class _InboxRepository extends InboxRepository {
   final notificationReads = <int>[];
   bool emptySearch = false;
   bool fail = false;
+  String itemTitle = '';
 
   @override
   Future<void> markMentionNotificationsRead(List<int> ids) async =>
@@ -60,8 +61,9 @@ class _InboxRepository extends InboxRepository {
           : [
               InboxItemModel.fromJson({
                 'id': status == 'complete' ? '2' : '1',
-                'title':
-                    status == 'complete' ? 'Finished item' : 'Pending item',
+                'title': itemTitle.isNotEmpty
+                    ? itemTitle
+                    : (status == 'complete' ? 'Finished item' : 'Pending item'),
                 'module_code': 'guest-book',
                 'subject_key': '42',
                 'has_unread': true,
@@ -256,5 +258,23 @@ void main() {
     expect(repository.reads.last,
         (module: 'guest-book', key: '42', type: 'guest', identity: '42'));
     expect(repository.notificationReads, [7, 8, 7, 8]);
+  });
+
+  testWidgets('inbox list strips data after colon in item titles',
+      (tester) async {
+    final api = ApiClient(customDio: Dio(), customStorage: _Storage());
+    final repository = _InboxRepository(api)
+      ..itemTitle = 'Task Header : Internal Task Details';
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        inboxRepositoryProvider.overrideWithValue(repository),
+        inboxNotifierProvider.overrideWith((ref) =>
+            InboxNotifier(repository, ReverbRealtimeService(api), null))
+      ],
+      child: const MaterialApp(home: InboxScreen()),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Task Header'), findsOneWidget);
+    expect(find.text('Task Header : Internal Task Details'), findsNothing);
   });
 }

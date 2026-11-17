@@ -236,7 +236,12 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     final preferredName = user?.preferredName?.trim();
-    final userName = preferredName?.isNotEmpty == true ? preferredName : null;
+    final firstWordName = user?.name.trim().split(RegExp(r'\s+')).firstOrNull;
+    final userName = (preferredName != null && preferredName.isNotEmpty)
+        ? preferredName
+        : (firstWordName != null && firstWordName.isNotEmpty
+            ? firstWordName
+            : null);
     final taskState = ref.watch(dashboardTasksProvider(_period));
     final dashboardInbox = ref.watch(_dashboardInboxProvider);
     final inbox = dashboardInbox.valueOrNull;
@@ -510,32 +515,47 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
                   child: Center(
                       child: Icon(icon, size: 21, color: Colors.white)))),
         );
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(colors: [
-                  OrbitColors.bubbleBlueBorder,
-                  OrbitColors.primaryNavy
-                ]),
-                border: Border.all(
-                    color: Colors.white.withValues(alpha: .5), width: 2),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x3306244D), blurRadius: 8)
-                ]),
-            child: const Icon(Icons.radio_button_checked,
-                size: 24, color: Colors.white)),
-        const SizedBox(width: 8),
-        const Expanded(
-            child: Text('Orbit\nWorkHub',
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      name == null ? greeting : '$greeting, $name',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        height: 1.15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Icon(
+                    Icons.waving_hand_rounded,
+                    size: 22,
+                    color: OrbitColors.brandOrangeLight,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                'Unified Workspace for Tasks, Chat, Projects & ERP',
                 style: TextStyle(
-                    fontSize: 15,
-                    height: 1.05,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white))),
+                  fontSize: 11,
+                  height: 1.25,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
         action(Icons.search_rounded, 'Search workspace', widget.onOpenSearch),
         Builder(
           builder: (menuContext) {
@@ -621,24 +641,8 @@ class _OrbitDashboardViewState extends ConsumerState<OrbitDashboardView> {
             });
           },
         ),
-      ]),
-      const SizedBox(height: 12),
-      Row(children: [
-        Flexible(
-            child: Text(name == null ? greeting : '$greeting, $name',
-                style: const TextStyle(
-                    fontSize: 20,
-                    height: 1.15,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white))),
-        const SizedBox(width: 5),
-        const Icon(Icons.waving_hand_rounded,
-            size: 22, color: OrbitColors.brandOrangeLight),
-      ]),
-      const SizedBox(height: 5),
-      const Text('Unified Workspace for Tasks, Chat, Projects & ERP',
-          style: TextStyle(fontSize: 11, height: 1.25, color: Colors.white)),
-    ]);
+      ],
+    );
   }
 
   Widget _buildPeriodPicker() => Row(children: [

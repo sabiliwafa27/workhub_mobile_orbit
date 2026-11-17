@@ -171,13 +171,16 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(referenceApp(ReferenceAdapter()));
     await tester.pumpAndSettle();
-    expect(find.text('Orbit\nWorkHub'), findsOneWidget);
+    expect(find.text('Orbit\nWorkHub'), findsNothing);
+    expect(find.byIcon(Icons.radio_button_checked), findsNothing);
+    expect(find.textContaining('Budi'), findsWidgets);
     expect(find.text('Total Tasks'), findsOneWidget);
     expect(find.text('42'), findsOneWidget);
     expect(find.text('Task Progress'), findsOneWidget);
     expect(find.text('19%'), findsOneWidget);
     expect(find.text('Tasks'), findsWidgets);
-    expect(find.text('Mail'), findsWidgets);
+    expect(find.text('More'), findsWidgets);
+    expect(find.byKey(const ValueKey('orbit-nav-add-button')), findsOneWidget);
     expect(OrbitColors.primaryNavy, const Color(0xFF06244D));
     expect(OrbitColors.brandOrange, const Color(0xFFD97706));
     expect(tester.takeException(), isNull);
@@ -189,21 +192,57 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Task Board create action stays above floating navigation',
+  testWidgets('Navbar order is Home - Inbox - (+) - Tasks - More (Projects & Mail)',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(360, 640));
+    await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(referenceApp(ReferenceAdapter()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tasks'));
-    await tester.pumpAndSettle();
-    final action = find.byTooltip('Create task');
-    expect(action, findsOneWidget);
+
+    final navBar = tester.widget<NavigationBar>(
+        find.byKey(const ValueKey('orbit-bottom-navigation')));
+    expect(navBar.destinations.length, 5);
     expect(
-        tester.getBottomRight(action).dy,
-        lessThan(tester
-            .getTopLeft(find.byKey(const ValueKey('orbit-bottom-navigation')))
-            .dy));
+      (navBar.destinations[0] as NavigationDestination).label,
+      'Home',
+    );
+    expect(
+      (navBar.destinations[1] as NavigationDestination).label,
+      'Inbox',
+    );
+    expect(
+      (navBar.destinations[2] as NavigationDestination).label,
+      '',
+    );
+    expect(
+      (navBar.destinations[3] as NavigationDestination).label,
+      'Tasks',
+    );
+    expect(
+      (navBar.destinations[4] as NavigationDestination).label,
+      'More',
+    );
+
+    // Tapping center (+) opens Create New sheet with task, EC, and chat options
+    await tester.tap(find.byKey(const ValueKey('orbit-nav-add-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Create New'), findsOneWidget);
+    expect(find.text('Create task'), findsOneWidget);
+    expect(find.text('Create EC'), findsOneWidget);
+    expect(find.text('New chat / DM'), findsOneWidget);
+    Navigator.of(tester.element(find.text('Create New'))).pop();
+    await tester.pumpAndSettle();
+
+    // Tapping More opens More Modules sheet with Projects and Mail
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
+    expect(find.text('More Modules'), findsOneWidget);
+    expect(find.text('Projects'), findsOneWidget);
+    expect(find.text('Mail'), findsOneWidget);
+
+    await tester.tap(find.text('Projects'));
+    await tester.pumpAndSettle();
+    expect(find.text('WorkHub Projects'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

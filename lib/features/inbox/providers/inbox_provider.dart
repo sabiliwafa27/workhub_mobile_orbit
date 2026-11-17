@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/realtime/reverb_service.dart';
+import '../../../core/services/fcm_notification_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chat/providers/chat_provider.dart';
 import '../models/inbox_item_model.dart';
@@ -245,6 +246,7 @@ class InboxNotifier extends StateNotifier<InboxListState> {
   String _status = 'pending';
   String _search = '';
   int _requestNumber = 0;
+  bool _hasLoaded = false;
   final List<void Function()> _cancelRealtimeSubscriptions = [];
 
   InboxNotifier(this._repo, this._reverb, this._userId, [this._employeeChats])
@@ -253,16 +255,22 @@ class InboxNotifier extends StateNotifier<InboxListState> {
     _setupRealtime();
   }
 
-  Future<void> loadInbox({String? status, String? search}) async {
+  Future<void> loadInbox({
+    String? status,
+    String? search,
+    bool showLoading = true,
+  }) async {
     _status = status ?? _status;
     _search = search ?? _search;
     final requestNumber = ++_requestNumber;
-    state = state.copyWith(
-        isLoading: true,
-        error: null,
-        chatError: null,
-        status: _status,
-        search: _search);
+    if (showLoading && !_hasLoaded) {
+      state = state.copyWith(
+          isLoading: true,
+          error: null,
+          chatError: null,
+          status: _status,
+          search: _search);
+    }
     try {
       final todos = await _repo.fetchTodos(status: _status, search: _search);
       if (!mounted || requestNumber != _requestNumber) return;
@@ -295,11 +303,19 @@ class InboxNotifier extends StateNotifier<InboxListState> {
       };
       final visibleChats =
           _status == 'complete' ? const <InboxItemModel>[] : allChats;
+      final totalIncomplete = todos.incompleteCount == null || chatError != null
+          ? todos.incompleteCount
+          : todos.incompleteCount! + allChats.length;
+
+      // Update app icon launcher badge with incomplete inbox count
+      if (totalIncomplete != null) {
+        FcmNotificationService.updateAppBadge(totalIncomplete);
+      }
+
+      _hasLoaded = true;
       state = InboxListState(
         items: [...todos.items, ...visibleChats],
-        incompleteCount: todos.incompleteCount == null || chatError != null
-            ? todos.incompleteCount
-            : todos.incompleteCount! + allChats.length,
+        incompleteCount: totalIncomplete,
         completeCount: todos.completeCount,
         incompleteUnreadCount:
             todos.incompleteUnreadCount == null || chatError != null
@@ -318,6 +334,7 @@ class InboxNotifier extends StateNotifier<InboxListState> {
       );
     } catch (e) {
       if (!mounted || requestNumber != _requestNumber) return;
+      _hasLoaded = true;
       state = state.copyWith(isLoading: false, error: inboxErrorMessage(e));
     }
   }
@@ -363,13 +380,30 @@ class InboxNotifier extends StateNotifier<InboxListState> {
     if (_userId != null) {
       _cancelRealtimeSubscriptions
           .add(_reverb.subscribe('private-inbox.user.$_userId', (eventData) {
-        loadInbox();
+        loadInbox(showLoading: false);
       }));
       _cancelRealtimeSubscriptions.add(
           _reverb.subscribe('private-App.Models.User.$_userId', (eventData) {
-        loadInbox();
+        loadInbox(showLoading: false);
       }));
     }
+
+    _cancelRealtimeSubscriptions
+        .add(_reverb.subscribe('inbox-updates', (eventData) {
+      loadInbox(showLoading: false);
+    }));
+    _cancelRealtimeSubscriptions
+        .add(_reverb.subscribe('task-updates', (eventData) {
+      loadInbox(showLoading: false);
+    }));
+    _cancelRealtimeSubscriptions
+        .add(_reverb.subscribe('ec-updates', (eventData) {
+      loadInbox(showLoading: false);
+    }));
+    _cancelRealtimeSubscriptions
+        .add(_reverb.subscribe('chat-updates', (eventData) {
+      loadInbox(showLoading: false);
+    }));
   }
 
   @override

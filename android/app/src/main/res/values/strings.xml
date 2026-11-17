@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">WorkHub Mobile</string>
+    <string name="asset_statements" translatable="false">[{\"include\": \"https://orbit.kecapsawi.net/.well-known/assetlinks.json\"}]</string>
 </resources>
