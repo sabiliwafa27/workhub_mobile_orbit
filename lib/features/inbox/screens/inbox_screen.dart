@@ -377,7 +377,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                                               ))
                                         ],
                                       ))
-                              : ListView.separated(
+                              : ListView.builder(
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
                                   padding: EdgeInsets.fromLTRB(
@@ -387,16 +387,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                                       orbitResponsiveListBottomPadding(
                                           context)),
                                   itemCount: filteredItems.length,
-                                  separatorBuilder: (_, __) => const ColoredBox(
-                                    color: OrbitColors.cardSurface,
-                                    child: Divider(
-                                      height: 1,
-                                      thickness: 1,
-                                      indent: 76,
-                                      endIndent: 16,
-                                      color: OrbitColors.cardBorder,
-                                    ),
-                                  ),
                                   itemBuilder: (context, index) {
                                     final item = filteredItems[index];
                                     return _buildInboxRow(
