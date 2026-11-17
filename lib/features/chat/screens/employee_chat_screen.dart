@@ -301,18 +301,20 @@ class EmployeeMessagesScreen extends ConsumerStatefulWidget {
 class _EmployeeMessagesScreenState
     extends ConsumerState<EmployeeMessagesScreen> {
   final message = TextEditingController();
-  late Future<List<dynamic>> messages;
+  final ScrollController _messagesScrollController = ScrollController();
+  List<dynamic> _messages = [];
+  bool _loadingMessages = true;
+  String? _messagesError;
+  int _loadGeneration = 0;
   bool sending = false;
   Timer? timer;
   @override
   void initState() {
     super.initState();
-    messages = load();
+    load(initial: true);
     timer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) {
-        setState(() {
-          messages = load();
-        });
+        load();
       }
     });
   }
@@ -321,36 +323,125 @@ class _EmployeeMessagesScreenState
   void dispose() {
     timer?.cancel();
     message.dispose();
+    _messagesScrollController.dispose();
     super.dispose();
   }
 
-  Future<List<dynamic>> load() async {
-    final dio = ref.read(apiClientProvider).dio;
-    final response =
-        await dio.get('/employee-chat/conversations/${widget.id}/messages');
-    final items = response.data['data'] as List;
-    if (items.isNotEmpty) {
-      await dio.post('/employee-chat/conversations/${widget.id}/read',
-          data: {'last_read_message_id': items.last['id']});
+  Future<void> load(
+      {bool initial = false, bool forceScrollToBottom = false}) async {
+    final generation = ++_loadGeneration;
+    final shouldScrollToBottom = initial ||
+        forceScrollToBottom ||
+        !_messagesScrollController.hasClients ||
+        _messagesScrollController.position.maxScrollExtent -
+                _messagesScrollController.position.pixels <
+            80;
+
+    if (initial && mounted) {
+      setState(() {
+        _loadingMessages = true;
+        _messagesError = null;
+      });
     }
-    return items;
+
+    try {
+      final dio = ref.read(apiClientProvider).dio;
+      final response =
+          await dio.get('/employee-chat/conversations/${widget.id}/messages');
+      final items = (response.data['data'] as List)
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+
+      if (items.isNotEmpty) {
+        try {
+          await dio.post('/employee-chat/conversations/${widget.id}/read',
+              data: {'last_read_message_id': items.last['id']});
+        } catch (_) {
+          // Keep the messages visible if updating the read position fails.
+        }
+      }
+
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _messages = items;
+        _messagesError = null;
+        _loadingMessages = false;
+      });
+      if (shouldScrollToBottom) _scheduleScrollToBottom();
+    } catch (_) {
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _messagesError = 'Unable to load messages.';
+        _loadingMessages = false;
+      });
+    }
+  }
+
+  void _scheduleScrollToBottom({bool animated = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_messagesScrollController.hasClients) return;
+      final position = _messagesScrollController.position;
+      if (animated) {
+        _messagesScrollController.animateTo(
+          position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _messagesScrollController.jumpTo(position.maxScrollExtent);
+      }
+    });
   }
 
   Future<void> send() async {
     final body = message.text.trim();
     if (body.isEmpty || sending) return;
-    setState(() => sending = true);
+    _loadGeneration++;
+    final optimisticId = 'pending-${DateTime.now().microsecondsSinceEpoch}';
+    final currentUserId = ref.read(authProvider).user?.id;
+    setState(() {
+      sending = true;
+      _messages = [
+        ..._messages,
+        {
+          'id': optimisticId,
+          'sender_user_id': currentUserId,
+          'body': body,
+          'created_at': DateTime.now().toIso8601String(),
+          'delivery_status': 'sending',
+        },
+      ];
+      _messagesError = null;
+    });
+    _scheduleScrollToBottom(animated: true);
+
     try {
-      await ref.read(apiClientProvider).dio.post(
+      final response = await ref.read(apiClientProvider).dio.post(
           '/employee-chat/conversations/${widget.id}/messages',
           data: {'body': body});
+      if (!mounted) return;
       message.clear();
+      setState(() {
+        _messages = _messages.map((item) {
+          if (item is Map && item['id'] == optimisticId) {
+            return {
+              ...Map<String, dynamic>.from(item),
+              'id': response.data['data']['id'],
+              'delivery_status': 'sent',
+            };
+          }
+          return item;
+        }).toList();
+      });
+      await load(forceScrollToBottom: true);
+    } catch (_) {
       if (mounted) {
         setState(() {
-          messages = load();
+          _messages
+              .removeWhere((item) => item is Map && item['id'] == optimisticId);
         });
       }
-    } catch (_) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Unable to send message.')));
@@ -364,121 +455,141 @@ class _EmployeeMessagesScreenState
       appBar: AppBar(title: Text(widget.name)),
       body: Column(children: [
         Expanded(
-            child: FutureBuilder<List<dynamic>>(
-                future: messages,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError)
-                    return Center(
+            child: _loadingMessages && _messages.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : _messagesError != null && _messages.isEmpty
+                    ? Center(
                         child: TextButton(
-                            onPressed: () => setState(() {
-                              messages = load();
-                            }),
-                            child: const Text(
-                                'Unable to load messages. Tap to retry.')));
-                  if (!snapshot.hasData)
-                    return const Center(child: CircularProgressIndicator());
-                  final items = snapshot.data!;
-                  final userId = ref.read(authProvider).user?.id;
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
-                    itemCount: items.length,
-                    itemBuilder: (_, i) {
-                      final item = Map<String, dynamic>.from(items[i] as Map);
-                      final mine = item['sender_user_id'] == userId;
-                      final sentAt = _messageDate(item);
-                      final previousDate = i == 0
-                          ? null
-                          : _messageDate(
-                              Map<String, dynamic>.from(items[i - 1] as Map));
-                      final showDate = sentAt != null &&
-                          (i == 0 ||
-                              previousDate == null ||
-                              !DateUtils.isSameDay(sentAt, previousDate));
-                      final body =
-                          (item['body'] ?? item['message'] ?? '').toString();
+                          onPressed: () => load(initial: true),
+                          child: const Text(
+                              'Unable to load messages. Tap to retry.'),
+                        ),
+                      )
+                    : _messages.isEmpty
+                        ? const Center(child: Text('No messages yet.'))
+                        : Builder(builder: (context) {
+                            final items = _messages;
+                            final userId = ref.read(authProvider).user?.id;
+                            return ListView.builder(
+                              controller: _messagesScrollController,
+                              padding:
+                                  const EdgeInsets.fromLTRB(10, 12, 10, 12),
+                              itemCount: items.length,
+                              itemBuilder: (_, i) {
+                                final item =
+                                    Map<String, dynamic>.from(items[i] as Map);
+                                final mine = item['sender_user_id'] == userId;
+                                final sentAt = _messageDate(item);
+                                final previousDate = i == 0
+                                    ? null
+                                    : _messageDate(Map<String, dynamic>.from(
+                                        items[i - 1] as Map));
+                                final showDate = sentAt != null &&
+                                    (i == 0 ||
+                                        previousDate == null ||
+                                        !DateUtils.isSameDay(
+                                            sentAt, previousDate));
+                                final body =
+                                    (item['body'] ?? item['message'] ?? '')
+                                        .toString();
 
-                      return Column(
-                        children: [
-                          if (showDate) _ChatDateCapsule(date: sentAt),
-                          Align(
-                            alignment: mine
-                                ? Alignment.centerRight
-                                : Alignment.centerLeft,
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 2),
-                              constraints: BoxConstraints(
-                                maxWidth:
-                                    MediaQuery.sizeOf(context).width * .78,
-                              ),
-                              padding: const EdgeInsets.fromLTRB(9, 6, 8, 5),
-                              decoration: BoxDecoration(
-                                color: mine
-                                    ? OrbitColors.primaryNavy
-                                    : OrbitColors.cardSurface,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(12),
-                                  topRight: const Radius.circular(12),
-                                  bottomLeft: Radius.circular(mine ? 12 : 4),
-                                  bottomRight: Radius.circular(mine ? 4 : 12),
-                                ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x14000000),
-                                    blurRadius: 1,
-                                    offset: Offset(0, 1),
-                                  ),
-                                ],
-                              ),
-                              child: Text.rich(
-                                TextSpan(
+                                return Column(
                                   children: [
-                                    TextSpan(
-                                      text: body,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        height: 1.32,
-                                      ).copyWith(
-                                        color: mine
-                                            ? Colors.white
-                                            : OrbitColors.textPrimary,
-                                      ),
-                                    ),
-                                    WidgetSpan(
-                                      alignment: PlaceholderAlignment.middle,
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(left: 7),
-                                        child: Text(
-                                          _messageTime(item),
-                                          style: const TextStyle(
-                                            fontSize: 10.5,
-                                            height: 1,
-                                          ).copyWith(
-                                            color: mine
-                                                ? const Color(0xFFC9D7E8)
-                                                : OrbitColors.textSecondary,
+                                    if (showDate)
+                                      _ChatDateCapsule(date: sentAt),
+                                    Align(
+                                      alignment: mine
+                                          ? Alignment.centerRight
+                                          : Alignment.centerLeft,
+                                      child: Container(
+                                        margin: const EdgeInsets.symmetric(
+                                            vertical: 2),
+                                        constraints: BoxConstraints(
+                                          maxWidth:
+                                              MediaQuery.sizeOf(context).width *
+                                                  .78,
+                                        ),
+                                        padding: const EdgeInsets.fromLTRB(
+                                            9, 6, 8, 5),
+                                        decoration: BoxDecoration(
+                                          color: mine
+                                              ? OrbitColors.primaryNavy
+                                              : OrbitColors.cardSurface,
+                                          borderRadius: BorderRadius.only(
+                                            topLeft: const Radius.circular(12),
+                                            topRight: const Radius.circular(12),
+                                            bottomLeft:
+                                                Radius.circular(mine ? 12 : 4),
+                                            bottomRight:
+                                                Radius.circular(mine ? 4 : 12),
+                                          ),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Color(0x14000000),
+                                              blurRadius: 1,
+                                              offset: Offset(0, 1),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Text.rich(
+                                          TextSpan(
+                                            children: [
+                                              TextSpan(
+                                                text: body,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  height: 1.32,
+                                                ).copyWith(
+                                                  color: mine
+                                                      ? Colors.white
+                                                      : OrbitColors.textPrimary,
+                                                ),
+                                              ),
+                                              WidgetSpan(
+                                                alignment:
+                                                    PlaceholderAlignment.middle,
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          left: 7),
+                                                  child: Text(
+                                                    _messageTime(item),
+                                                    style: const TextStyle(
+                                                      fontSize: 10.5,
+                                                      height: 1,
+                                                    ).copyWith(
+                                                      color: mine
+                                                          ? const Color(
+                                                              0xFFC9D7E8)
+                                                          : OrbitColors
+                                                              .textSecondary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              if (mine)
+                                                WidgetSpan(
+                                                  alignment:
+                                                      PlaceholderAlignment
+                                                          .middle,
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                            left: 2),
+                                                    child: _MessageChecks(
+                                                        status: item),
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ),
                                       ),
                                     ),
-                                    if (mine)
-                                      WidgetSpan(
-                                        alignment: PlaceholderAlignment.middle,
-                                        child: Padding(
-                                          padding:
-                                              const EdgeInsets.only(left: 2),
-                                          child: _MessageChecks(status: item),
-                                        ),
-                                      ),
                                   ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                })),
+                                );
+                              },
+                            );
+                          })),
         SafeArea(
             child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
