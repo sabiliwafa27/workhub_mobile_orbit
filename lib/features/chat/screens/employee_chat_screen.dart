@@ -330,12 +330,9 @@ class _EmployeeMessagesScreenState
   Future<void> load(
       {bool initial = false, bool forceScrollToBottom = false}) async {
     final generation = ++_loadGeneration;
-    final shouldScrollToBottom = initial ||
-        forceScrollToBottom ||
+    final shouldScrollToBottom = forceScrollToBottom ||
         !_messagesScrollController.hasClients ||
-        _messagesScrollController.position.maxScrollExtent -
-                _messagesScrollController.position.pixels <
-            80;
+        _messagesScrollController.position.pixels < 80;
 
     if (initial && mounted) {
       setState(() {
@@ -384,12 +381,12 @@ class _EmployeeMessagesScreenState
       final position = _messagesScrollController.position;
       if (animated) {
         _messagesScrollController.animateTo(
-          position.maxScrollExtent,
+          0,
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOut,
         );
       } else {
-        _messagesScrollController.jumpTo(position.maxScrollExtent);
+        _messagesScrollController.jumpTo(0);
       }
     });
   }
@@ -471,24 +468,25 @@ class _EmployeeMessagesScreenState
                             final items = _messages;
                             final userId = ref.read(authProvider).user?.id;
                             return ListView.builder(
+                              reverse: true,
                               controller: _messagesScrollController,
                               padding:
                                   const EdgeInsets.fromLTRB(10, 12, 10, 12),
                               itemCount: items.length,
                               itemBuilder: (_, i) {
-                                final item =
-                                    Map<String, dynamic>.from(items[i] as Map);
+                                final messageIndex = items.length - 1 - i;
+                                final item = Map<String, dynamic>.from(
+                                    items[messageIndex] as Map);
                                 final mine = item['sender_user_id'] == userId;
                                 final sentAt = _messageDate(item);
-                                final previousDate = i == 0
+                                final olderDate = messageIndex == 0
                                     ? null
                                     : _messageDate(Map<String, dynamic>.from(
-                                        items[i - 1] as Map));
+                                        items[messageIndex - 1] as Map));
                                 final showDate = sentAt != null &&
-                                    (i == 0 ||
-                                        previousDate == null ||
+                                    (olderDate == null ||
                                         !DateUtils.isSameDay(
-                                            sentAt, previousDate));
+                                            sentAt, olderDate));
                                 final body =
                                     (item['body'] ?? item['message'] ?? '')
                                         .toString();
