@@ -1,9 +1,98 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../models/user_model.dart';
 import '../services/passkey_service.dart';
+
+String _loginFailureMessage(DioException exception) {
+  final statusCode = exception.response?.statusCode;
+  final responseData = exception.response?.data;
+
+  if (responseData is Map && (statusCode == null || statusCode < 500)) {
+    final validationMessage = _firstErrorMessage(responseData['errors']);
+    if (validationMessage != null) return validationMessage;
+
+    final serverMessage = _cleanServerMessage(responseData['message']) ??
+        _cleanServerMessage(responseData['error']);
+    if (serverMessage != null) return serverMessage;
+  }
+
+  if (statusCode != null) {
+    if (statusCode == 401) {
+      return 'Email or password is incorrect, or this account cannot sign in.';
+    }
+    if (statusCode == 403) {
+      return 'This account is not allowed to sign in. Contact your administrator.';
+    }
+    if (statusCode == 422) {
+      return 'The login details were rejected. Check the email and required fields.';
+    }
+    if (statusCode == 429) {
+      return 'Too many login attempts. Wait a moment and try again.';
+    }
+    if (statusCode >= 500) {
+      return 'The sign-in service is temporarily unavailable. Try again shortly.';
+    }
+    return 'Sign-in failed (HTTP $statusCode). Please try again.';
+  }
+
+  return switch (exception.type) {
+    DioExceptionType.connectionTimeout ||
+    DioExceptionType.sendTimeout ||
+    DioExceptionType.receiveTimeout ||
+    DioExceptionType.transformTimeout =>
+      'The sign-in request timed out. Check your connection and try again.',
+    DioExceptionType.connectionError =>
+      'Unable to reach the sign-in server. Check your internet connection.',
+    DioExceptionType.badCertificate =>
+      'A secure connection to the sign-in server could not be established.',
+    DioExceptionType.badResponse =>
+      'The sign-in server returned an invalid response. Try again later.',
+    DioExceptionType.cancel => 'The sign-in request was cancelled.',
+    DioExceptionType.unknown => _unknownLoginFailureMessage(exception),
+  };
+}
+
+String _unknownLoginFailureMessage(DioException exception) {
+  final cause = exception.error?.toString().toLowerCase() ?? '';
+  if (cause.contains('handshake') || cause.contains('certificate')) {
+    return 'A secure connection to the sign-in server could not be established.';
+  }
+  if (cause.contains('socketexception') ||
+      cause.contains('failed host lookup') ||
+      cause.contains('network is unreachable')) {
+    return 'Unable to reach the sign-in server. Check your internet connection.';
+  }
+  if (cause.contains('formatexception')) {
+    return 'The sign-in server returned an unreadable response. Try again later.';
+  }
+  return 'Unable to sign in right now. Check your connection and try again.';
+}
+
+String? _firstErrorMessage(dynamic errors) {
+  if (errors is! Map) return null;
+  for (final value in errors.values) {
+    if (value is List) {
+      for (final item in value) {
+        final message = _cleanServerMessage(item);
+        if (message != null) return message;
+      }
+    } else {
+      final message = _cleanServerMessage(value);
+      if (message != null) return message;
+    }
+  }
+  return null;
+}
+
+String? _cleanServerMessage(dynamic value) {
+  if (value is! String) return null;
+  final message = value.trim();
+  if (message.isEmpty || message.length > 240) return null;
+  return message;
+}
 
 final storageServiceProvider = Provider<SecureStorageService>((ref) {
   return SecureStorageService();
@@ -134,12 +223,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       return true;
     } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ??
-          'Login failed. Please check credentials.';
-      state = state.copyWith(isLoading: false, errorMessage: msg);
+      debugPrint(
+        '[AUTH] Login request failed: type=${e.type.name}, '
+        'status=${e.response?.statusCode ?? 'none'}, '
+        'cause=${e.error?.runtimeType ?? 'none'}',
+      );
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: _loginFailureMessage(e),
+      );
       return false;
     } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      debugPrint('[AUTH] Login response parsing failed: ${e.runtimeType}');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'The server returned an unexpected sign-in response.',
+      );
       return false;
     }
   }
@@ -173,7 +272,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<MyProfileResponse?> fetchMyProfile({bool updateAuthState = true}) async {
+  Future<MyProfileResponse?> fetchMyProfile(
+      {bool updateAuthState = true}) async {
     try {
       final response = await _apiClient.dio.get('/auth/my-profile');
       final raw = response.data is Map

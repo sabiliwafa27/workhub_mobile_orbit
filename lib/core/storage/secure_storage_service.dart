@@ -21,16 +21,19 @@ class SecureStorageService {
   }
 
   Future<String> getBaseUrl() async {
-    final customUrl = await _storage.read(key: ApiConstants.baseUrlKey);
-    if (customUrl != null && customUrl.isNotEmpty) {
-      // Strip trailing /api/v1 or trailing slashes so baseUrl is strictly the root host origin
-      var cleaned = customUrl
-          .replaceAll(RegExp(r'/api/v1/?$'), '')
-          .replaceAll(RegExp(r'/+$'), '');
-      if (cleaned.contains('10.11.2.49') || cleaned.contains('rosyad-erplab')) {
-        cleaned = ApiConstants.defaultBaseUrl;
+    try {
+      final migrated = await _storage.read(
+        key: ApiConstants.baseUrlMigrationKey,
+      );
+      if (migrated != 'true') {
+        await _storage.delete(key: ApiConstants.baseUrlKey);
+        await _storage.write(
+          key: ApiConstants.baseUrlMigrationKey,
+          value: 'true',
+        );
       }
-      return cleaned;
+    } catch (_) {
+      // Always use the production host if a legacy URL cannot be migrated.
     }
     return ApiConstants.defaultBaseUrl;
   }

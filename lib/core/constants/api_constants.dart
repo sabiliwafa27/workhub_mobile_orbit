@@ -6,4 +6,5 @@ class ApiConstants {
   static const String tokenKey = 'workhub_auth_token';
   static const String userKey = 'workhub_user_profile';
   static const String baseUrlKey = 'workhub_custom_base_url';
+  static const String baseUrlMigrationKey = 'workhub_base_url_defaulted_v1';
 }
